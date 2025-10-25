@@ -3,221 +3,135 @@
 # Version 1.0 Beta
 # ============================================
 # This file contains ALL configuration for CloudLens
-# Including WiFi credentials and API keys
+# CircuitPython reads this as flat key-value pairs
 # ============================================
 
 # ============================================
 # CREDENTIALS
 # ============================================
 
-# WiFi Configuration
 CIRCUITPY_WIFI_SSID = "your-wifi-ssid"
 CIRCUITPY_WIFI_PASSWORD = "your-wifi-password"
-
-# Anthropic API Key
 ANTHROPIC_API_KEY = "sk-ant-your-api-key-here"
 
 # ============================================
 # CLAUDE API CONFIGURATION
 # ============================================
 
-# Claude model to use
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
-
-# Maximum tokens for Claude response
-CLAUDE_MAX_TOKENS = 1024
-
-# Claude API version
+CLAUDE_MAX_TOKENS = "1024"
 CLAUDE_API_VERSION = "2023-06-01"
-
-# Claude API endpoint
 CLAUDE_ENDPOINT = "https://api.anthropic.com/v1/messages"
 
 # ============================================
 # NETWORK CONFIGURATION
 # ============================================
 
-# WiFi connection timeout in seconds
-WIFI_TIMEOUT = 30
-
-# Number of WiFi connection retry attempts
-WIFI_RETRY_ATTEMPTS = 3
-
-# API request timeout in seconds
-API_TIMEOUT = 120
-
-# Number of API retry attempts
-API_RETRY_ATTEMPTS = 3
-
-# Delay between API retries in seconds
-API_RETRY_DELAY = 2
+WIFI_TIMEOUT = "30"
+WIFI_RETRY_ATTEMPTS = "3"
+API_TIMEOUT = "120"
+API_RETRY_ATTEMPTS = "3"
+API_RETRY_DELAY = "2"
 
 # ============================================
 # CAMERA CONFIGURATION
 # ============================================
 
-# Camera resolution setting
-# 0 = 240x240, 1 = 320x240, 2 = 640x480, 3 = 800x600
-# 4 = 1024x768, 5 = 1280x720, 6 = 1280x1024
-CAMERA_RESOLUTION = 3
-
-# Default quality mode (LOW, MEDIUM, HIGH, ULTRA)
+CAMERA_RESOLUTION = "3"
 DEFAULT_QUALITY_MODE = "MEDIUM"
-
-# Maximum image size in KB (Claude API limit)
-MAX_IMAGE_SIZE_KB = 3072
+MAX_IMAGE_SIZE_KB = "3072"
 
 # ============================================
-# QUALITY MODES
+# QUALITY MODES - FLAT STRUCTURE
 # ============================================
 
-[quality.LOW]
-resolution = 2
-label = "LOW 640p"
-target_kb = 300
-max_expected_kb = 450
-icon = "◆"
+# LOW Quality Mode
+quality.LOW.resolution = "2"
+quality.LOW.label = "LOW 640p"
+quality.LOW.target_kb = "300"
+quality.LOW.max_expected_kb = "450"
+quality.LOW.icon = "◆"
 
-[quality.MEDIUM]
-resolution = 3
-label = "MED 800p"
-target_kb = 600
-max_expected_kb = 800
-icon = "◆◆"
+# MEDIUM Quality Mode
+quality.MEDIUM.resolution = "3"
+quality.MEDIUM.label = "MED 800p"
+quality.MEDIUM.target_kb = "600"
+quality.MEDIUM.max_expected_kb = "800"
+quality.MEDIUM.icon = "◆◆"
 
-[quality.HIGH]
-resolution = 4
-label = "HIGH 1024p"
-target_kb = 1000
-max_expected_kb = 1400
-icon = "◆◆◆"
+# HIGH Quality Mode
+quality.HIGH.resolution = "4"
+quality.HIGH.label = "HIGH 1024p"
+quality.HIGH.target_kb = "1000"
+quality.HIGH.max_expected_kb = "1400"
+quality.HIGH.icon = "◆◆◆"
 
-[quality.ULTRA]
-resolution = 5
-label = "ULTRA 720p"
-target_kb = 1400
-max_expected_kb = 2000
-icon = "★"
+# ULTRA Quality Mode
+quality.ULTRA.resolution = "5"
+quality.ULTRA.label = "ULTRA 720p"
+quality.ULTRA.target_kb = "1400"
+quality.ULTRA.max_expected_kb = "2000"
+quality.ULTRA.icon = "★"
 
 # ============================================
 # FLASH CONFIGURATION
 # ============================================
 
-# Enable automatic flash based on ambient light
-AUTO_FLASH_ENABLED = true
-
-# Light sensor threshold (0-255)
-# Below this value, flash will trigger automatically
-DARK_THRESHOLD = 30
+AUTO_FLASH_ENABLED = "true"
+DARK_THRESHOLD = "30"
 
 # ============================================
 # DISPLAY CONFIGURATION
 # ============================================
 
-# Text scale for display
-TEXT_SCALE = 2
-
-# Text wrap width (characters per line)
-TEXT_WRAP_WIDTH = 20
-
-# Lines per page in text viewer
-LINES_PER_PAGE = 7
-
-# Text Y position offset from top
-TEXT_Y_POSITION = 20
-
-# Message display duration in seconds
-MSG_DURATION = 0.5
+TEXT_SCALE = "2"
+TEXT_WRAP_WIDTH = "20"
+LINES_PER_PAGE = "7"
+TEXT_Y_POSITION = "20"
+MSG_DURATION = "0.5"
 
 # ============================================
 # PROMPT CONFIGURATION
 # ============================================
 
-# Define the order prompts appear in the UI (comma-separated)
 PROMPT_ORDER = "DESCRIBE,ART_ANALYSIS,DRAMA,STUDY,KINDNESS,HAIKU,TRANSLATE,ALIEN,WEIRD,MOVIE,PLANT,CAR"
 
 # ============================================
 # PROMPT DEFINITIONS
-# Each prompt has:
-#   - label: Display name shown in UI
-#   - prompt: The instruction sent to Claude
 # ============================================
 
 DESCRIBE_LABEL = "DESCRIBE"
-DESCRIBE_PROMPT = """Please describe what is in this image. The description should be in the \
-style of alt text used on social media sites like Mastodon. Avoid talking about the \
-quality of the image. Avoid talking about the background of the image. Only describe \
-the main subject."""
+DESCRIBE_PROMPT = """Please describe what is in this image. The description should be in the style of alt text used on social media sites like Mastodon. Avoid talking about the quality of the image. Avoid talking about the background of the image. Only describe the main subject."""
 
 HAIKU_LABEL = "HAIKU"
-HAIKU_PROMPT = """Please identify the main subject of the image and write a haiku about it. \
-It should be a three line poem that consists of three lines, with five syllables in the \
-first line, seven in the second, and five in the third. It does not need to rhyme. Only \
-return the haiku, no image description is necessary. Please insert a * between each line \
-instead of a comma (,)."""
+HAIKU_PROMPT = """Please identify the main subject of the image and write a haiku about it. It should be a three line poem that consists of three lines, with five syllables in the first line, seven in the second, and five in the third. It does not need to rhyme. Only return the haiku, no image description is necessary. Please insert a * between each line instead of a comma (,)."""
 
 ART_ANALYSIS_LABEL = "ART ANALYSIS"
-ART_ANALYSIS_PROMPT = """Analyze this artwork using formal art elements and principles: LINE (what \
-types of lines - curved, straight, jagged?), SHAPE (geometric or organic?), COLOR (warm \
-or cool palette? contrast?), TEXTURE (implied texture - rough, smooth?), SPACE \
-(positive/negative space, depth?), BALANCE (symmetrical or asymmetrical?), EMPHASIS \
-(what's the focal point?). Be specific and educational."""
+ART_ANALYSIS_PROMPT = """Analyze this artwork using formal art elements and principles: LINE (what types of lines - curved, straight, jagged?), SHAPE (geometric or organic?), COLOR (warm or cool palette? contrast?), TEXTURE (implied texture - rough, smooth?), SPACE (positive/negative space, depth?), BALANCE (symmetrical or asymmetrical?), EMPHASIS (what's the focal point?). Be specific and educational."""
 
 TRANSLATE_LABEL = "TRANSLATE"
-TRANSLATE_PROMPT = """This image has text that is not in English. Please translate it to English. \
-Only return the translated text in English. For example, if the text reads hola (hello \
-in Spanish), then return hello (translated to English). No further explanation is \
-necessary. If you are not sure on how to translate a word(s) then please return the text \
-as seen in the image. You do not need to describe the image."""
+TRANSLATE_PROMPT = """This image has text that is not in English. Please translate it to English. Only return the translated text in English. For example, if the text reads hola (hello in Spanish), then return hello (translated to English). No further explanation is necessary. If you are not sure on how to translate a word(s) then please return the text as seen in the image. You do not need to describe the image."""
 
 ALIEN_LABEL = "ALIEN"
-ALIEN_PROMPT = """Describe this image as if you are a friendly alien visiting from another \
-world in our galaxy. You have no context for society on Earth. Your descriptions are \
-cute, inquisitive and concise (2-3 sentences). You do not need to comment on the quality \
-of the image."""
+ALIEN_PROMPT = """Describe this image as if you are a friendly alien visiting from another world in our galaxy. You have no context for society on Earth. Your descriptions are cute, inquisitive and concise (2-3 sentences). You do not need to comment on the quality of the image."""
 
 WEIRD_LABEL = "WEIRD?"
-WEIRD_PROMPT = """Take in the full image as context. Is there anything in the image that is \
-out of the ordinary or interesting? For example, if the image is of a backyard, do you \
-see any animals or objects that catch your eye? You do not need to comment on the quality \
-of the image. Please keep responses brief and concise, between one to two sentences. If \
-you do not see anything out of the ordinary for the context of the image or anything \
-particularly interesting, please return: Nothing to see here."""
+WEIRD_PROMPT = """Take in the full image as context. Is there anything in the image that is out of the ordinary or interesting? For example, if the image is of a backyard, do you see any animals or objects that catch your eye? You do not need to comment on the quality of the image. Please keep responses brief and concise, between one to two sentences. If you do not see anything out of the ordinary for the context of the image or anything particularly interesting, please return: Nothing to see here."""
 
 MOVIE_LABEL = "MOVIE"
-MOVIE_PROMPT = """Using the main subject of the photo, please create a two to four word \
-sensational descriptive movie title and one short sentence subtitle. Just return the \
-title and subtitle. No other information is necessary. Just return the text of the title \
-and subtitle."""
+MOVIE_PROMPT = """Using the main subject of the photo, please create a two to four word sensational descriptive movie title and one short sentence subtitle. Just return the title and subtitle. No other information is necessary. Just return the text of the title and subtitle."""
 
 PLANT_LABEL = "PLANT_ID"
-PLANT_PROMPT = """Using the main subject of the photo, only return the species, common name \
-and the genus."""
+PLANT_PROMPT = """Using the main subject of the photo, only return the species, common name and the genus."""
 
 CAR_LABEL = "CARS"
-CAR_PROMPT = """Use the shape of the main subject to influence your imagination. Imagine the \
-main subject of the photo is an automobile. Imagine what actual car manufacturer would \
-make it, create a unique fictitious model name for it, and provide a short one sentence \
-purpose. Only return the model and purpose. Please insert a * between each line instead \
-of a comma (,)."""
+CAR_PROMPT = """Use the shape of the main subject to influence your imagination. Imagine the main subject of the photo is an automobile. Imagine what actual car manufacturer would make it, create a unique fictitious model name for it, and provide a short one sentence purpose. Only return the model and purpose. Please insert a * between each line instead of a comma (,)."""
 
 DRAMA_LABEL = "DRAMA"
-DRAMA_PROMPT = """You are writing a dramatic soap opera scene. The object in this photo is the \
-STAR of the show. Give it a name, a personality, a secret, a rival, and a dramatic \
-backstory. What is its biggest fear? Its deepest desire? What scandal is it hiding? Write \
-2-3 sentences of PEAK DRAMA like it's a soap opera cliffhanger. Be ridiculously \
-over-the-top."""
+DRAMA_PROMPT = """You are writing a dramatic soap opera scene. The object in this photo is the STAR of the show. Give it a name, a personality, a secret, a rival, and a dramatic backstory. What is its biggest fear? Its deepest desire? What scandal is it hiding? Write 2-3 sentences of PEAK DRAMA like it's a soap opera cliffhanger. Be ridiculously over-the-top."""
 
 STUDY_LABEL = "STUDY BUDDY"
-STUDY_PROMPT = """You are a patient tutor. This image shows notes, a textbook page, a \
-worksheet, or study materials. Based on what you see: 1) Identify the subject and topic, \
-2) Create 3 practice questions about this material, 3) Provide one memory trick or \
-mnemonic device, 4) Suggest one real-world application of this concept. Be encouraging \
-and educational."""
+STUDY_PROMPT = """You are a patient tutor. This image shows notes, a textbook page, a worksheet, or study materials. Based on what you see: 1) Identify the subject and topic, 2) Create 3 practice questions about this material, 3) Provide one memory trick or mnemonic device, 4) Suggest one real-world application of this concept. Be encouraging and educational."""
 
 KINDNESS_LABEL = "KINDNESS"
-KINDNESS_PROMPT = """You are documenting a moment of human kindness. Based on this image, \
-describe: 1) What act of kindness, care, or connection do you observe? 2) What emotions \
-might the people involved be feeling? 3) Why do small moments like this matter? 4) How \
-might this kindness ripple outward? Be warm, optimistic, and highlight the positive \
-aspects of human connection. Even in ordinary scenes, find the kindness."""
+KINDNESS_PROMPT = """You are documenting a moment of human kindness. Based on this image, describe: 1) What act of kindness, care, or connection do you observe? 2) What emotions might the people involved be feeling? 3) Why do small moments like this matter? 4) How might this kindness ripple outward? Be warm, optimistic, and highlight the positive aspects of human connection. Even in ordinary scenes, find the kindness."""
