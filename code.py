@@ -73,7 +73,7 @@ class Config:
             "label": os.getenv(f"{prefix}label", mode_name),
             "target_kb": int(os.getenv(f"{prefix}target_kb", "600")),
             "max_expected_kb": int(os.getenv(f"{prefix}max_expected_kb", "800")),
-            "icon": os.getenv(f"{prefix}icon", "◆")
+            "icon": os.getenv(f"{prefix}icon", "*")
         }
 
     @classmethod

@@ -50,28 +50,28 @@ quality_LOW_resolution = "2"
 quality_LOW_label = "LOW 640p"
 quality_LOW_target_kb = "300"
 quality_LOW_max_expected_kb = "450"
-quality_LOW_icon = "◆"
+quality_LOW_icon = "*"
 
 # MEDIUM Quality Mode
 quality_MEDIUM_resolution = "3"
 quality_MEDIUM_label = "MED 800p"
 quality_MEDIUM_target_kb = "600"
 quality_MEDIUM_max_expected_kb = "800"
-quality_MEDIUM_icon = "◆◆"
+quality_MEDIUM_icon = "**"
 
 # HIGH Quality Mode
 quality_HIGH_resolution = "4"
 quality_HIGH_label = "HIGH 1024p"
 quality_HIGH_target_kb = "1000"
 quality_HIGH_max_expected_kb = "1400"
-quality_HIGH_icon = "◆◆◆"
+quality_HIGH_icon = "***"
 
 # ULTRA Quality Mode
 quality_ULTRA_resolution = "5"
 quality_ULTRA_label = "ULTRA 720p"
 quality_ULTRA_target_kb = "1400"
 quality_ULTRA_max_expected_kb = "2000"
-quality_ULTRA_icon = "★"
+quality_ULTRA_icon = "++"
 
 # ============================================
 # FLASH CONFIGURATION
