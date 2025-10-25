@@ -875,6 +875,7 @@ def main():
 
     # Application state
     system_ready = False
+    ready_message_cleared = False  # Track when READY message is fully cleared
     showing_captured_image = False
     view_mode = False
     browse_mode = False
@@ -884,7 +885,10 @@ def main():
     # Show READY message to user
     pycam.display_message("READY!", color=0x00FF00)
     time.sleep(1.5)
+
+    # Clear READY message and start viewfinder
     pycam.display.refresh()
+    time.sleep(0.3)  # Brief delay to ensure message is cleared
     system_ready = True
 
     logger.info("Ready! Controls:")
@@ -908,15 +912,18 @@ def main():
                     frame = pycam.continuous_capture()
                     if frame and hasattr(frame, 'width') and hasattr(frame, 'height'):
                         pycam.blit(frame)
+                        # Mark READY message as cleared after first frame
+                        if not ready_message_cleared:
+                            ready_message_cleared = True
                 except Exception as e:
                     pass
 
             pycam.keys_debounce()
 
-            if not system_ready:
+            if not system_ready or not ready_message_cleared:
                 continue
 
-            # SHUTTER BUTTON
+            # SHUTTER BUTTON - Now blocked until READY message is cleared and viewfinder running
             if pycam.shutter.long_press and not view_mode:
                 logger.info("Autofocus triggered")
                 pycam.autofocus()
