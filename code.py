@@ -63,11 +63,11 @@ class Config:
     DEFAULT_QUALITY_MODE = os.getenv("DEFAULT_QUALITY_MODE", "MEDIUM")
     MAX_IMAGE_SIZE_KB = int(os.getenv("MAX_IMAGE_SIZE_KB", "3072"))
 
-    # Quality modes - read from settings.toml [quality.*] sections
+    # Quality modes - read from settings.toml flat structure
     @classmethod
     def _load_quality_mode(cls, mode_name):
         """Load a single quality mode from settings.toml"""
-        prefix = f"quality.{mode_name}."
+        prefix = f"quality_{mode_name}_"
         return {
             "resolution": int(os.getenv(f"{prefix}resolution", "3")),
             "label": os.getenv(f"{prefix}label", mode_name),

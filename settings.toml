@@ -46,32 +46,32 @@ MAX_IMAGE_SIZE_KB = "3072"
 # ============================================
 
 # LOW Quality Mode
-quality.LOW.resolution = "2"
-quality.LOW.label = "LOW 640p"
-quality.LOW.target_kb = "300"
-quality.LOW.max_expected_kb = "450"
-quality.LOW.icon = "◆"
+quality_LOW_resolution = "2"
+quality_LOW_label = "LOW 640p"
+quality_LOW_target_kb = "300"
+quality_LOW_max_expected_kb = "450"
+quality_LOW_icon = "◆"
 
 # MEDIUM Quality Mode
-quality.MEDIUM.resolution = "3"
-quality.MEDIUM.label = "MED 800p"
-quality.MEDIUM.target_kb = "600"
-quality.MEDIUM.max_expected_kb = "800"
-quality.MEDIUM.icon = "◆◆"
+quality_MEDIUM_resolution = "3"
+quality_MEDIUM_label = "MED 800p"
+quality_MEDIUM_target_kb = "600"
+quality_MEDIUM_max_expected_kb = "800"
+quality_MEDIUM_icon = "◆◆"
 
 # HIGH Quality Mode
-quality.HIGH.resolution = "4"
-quality.HIGH.label = "HIGH 1024p"
-quality.HIGH.target_kb = "1000"
-quality.HIGH.max_expected_kb = "1400"
-quality.HIGH.icon = "◆◆◆"
+quality_HIGH_resolution = "4"
+quality_HIGH_label = "HIGH 1024p"
+quality_HIGH_target_kb = "1000"
+quality_HIGH_max_expected_kb = "1400"
+quality_HIGH_icon = "◆◆◆"
 
 # ULTRA Quality Mode
-quality.ULTRA.resolution = "5"
-quality.ULTRA.label = "ULTRA 720p"
-quality.ULTRA.target_kb = "1400"
-quality.ULTRA.max_expected_kb = "2000"
-quality.ULTRA.icon = "★"
+quality_ULTRA_resolution = "5"
+quality_ULTRA_label = "ULTRA 720p"
+quality_ULTRA_target_kb = "1400"
+quality_ULTRA_max_expected_kb = "2000"
+quality_ULTRA_icon = "★"
 
 # ============================================
 # FLASH CONFIGURATION
