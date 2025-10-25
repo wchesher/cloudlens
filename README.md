@@ -27,16 +27,15 @@ CloudLens is a CircuitPython-based AI vision system that integrates camera hardw
 2. **Install required libraries** from the CircuitPython bundle (see `requirements.txt`)
 3. **Copy project files** to your CIRCUITPY drive:
    - `code.py` (main application)
-   - `settings.toml` (configuration)
+   - `settings.toml` (configuration - optional)
    - `secrets.toml` (from `secrets.toml.example`)
-   - `lib/` directory (settings loader and dependencies)
 4. **Configure credentials** in `secrets.toml`:
    ```toml
    CIRCUITPY_WIFI_SSID = "your-network"
    CIRCUITPY_WIFI_PASSWORD = "your-password"
    ANTHROPIC_API_KEY = "sk-ant-api03-..."
    ```
-5. **Customize settings** in `settings.toml` as needed
+5. **Customize settings** in `settings.toml` as needed (optional - has defaults)
 6. **Reset your device** to start the application
 
 ## Configuration
@@ -108,11 +107,11 @@ order = "DESCRIBE,CUSTOM,..."
 
 ## Architectural Highlights
 
+- **Self-Contained**: Single code.py file with all logic included
 - **Configuration as Code**: All settings externalized to TOML files
 - **Separation of Concerns**: Code, settings, and secrets completely separated
-- **Fail-Fast Validation**: Early detection of configuration errors
-- **Network Resilience**: Retry logic with exponential backoff
-- **Modular Design**: Reusable settings loader and clean function architecture
+- **Network Resilience**: Retry logic with automatic reconnection
+- **Clean Design**: Modular functions with clear responsibilities
 
 ## Learning Outcomes
 
@@ -138,12 +137,10 @@ CloudLens serves as a teaching tool for:
 
 ```
 cloudlens/
-├── code.py                    # Main application (no hardcoded values)
-├── settings.toml              # All configuration settings
+├── code.py                    # Main application (self-contained)
+├── settings.toml              # All configuration settings (optional)
 ├── secrets.toml               # Credentials (NOT in git)
 ├── secrets.toml.example       # Template for secrets
-├── lib/
-│   └── settings_loader.py     # Settings management utility
 ├── requirements.txt           # CircuitPython library dependencies
 ├── README.md                  # This file
 └── LICENSE                    # MIT License

@@ -1,156 +1,122 @@
 """
-CloudFX - AI Vision for CircuitPython
-Version 1.0
+CloudLens - AI Vision for CircuitPython
+An educational IoT project demonstrating camera integration with Anthropic Claude API.
 
-An educational IoT project demonstrating:
-- Camera integration with CircuitPython
-- API integration with Anthropic Claude
-- Configuration management best practices
-- Modular and maintainable code structure
-
-This file contains NO hardcoded values - all configuration is in settings.toml
-and secrets.toml.
-
-Author: CloudFX Project
+Author: William Chesher
 License: MIT
 """
 
 import time
 import board
-import displayio
-import terminalio
-from adafruit_display_text import label
 import wifi
 import socketpool
 import ssl
 import adafruit_requests
-
-# Import our settings loader
-from lib.settings_loader import load_settings, SettingsError
-
+import os
 
 # ============================================
-# GLOBAL STATE
-# ============================================
-# Educational note: We minimize global state and use it only for
-# configuration that is loaded once at startup.
-
-settings = None
-requests = None
-current_prompt_index = 0
-
-
-# ============================================
-# INITIALIZATION FUNCTIONS
+# CONFIGURATION LOADING
 # ============================================
 
-def initialize_settings():
-    """
-    Load and validate all configuration.
-
-    This function demonstrates:
-    - Early validation (fail fast)
-    - Clear error messages for debugging
-    - Separation of configuration from code
-
-    Returns:
-        Settings object if successful, None if failed
-    """
-    print("Loading settings...")
-
+def load_config():
+    """Load settings from settings.toml and secrets from secrets.toml"""
     try:
-        cfg = load_settings()
-        print("✓ Settings loaded successfully")
-        return cfg
-    except SettingsError as e:
-        print(f"✗ Settings error: {e}")
-        print("\nPlease check your settings.toml and secrets.toml files.")
-        return None
-    except Exception as e:
-        print(f"✗ Unexpected error loading settings: {e}")
-        return None
+        import toml
+    except ImportError:
+        print("✗ TOML library not available - using os.getenv for secrets")
+        toml = None
+
+    config = {}
+
+    # Load secrets from environment (CircuitPython reads secrets.toml into env)
+    config['wifi_ssid'] = os.getenv('CIRCUITPY_WIFI_SSID')
+    config['wifi_password'] = os.getenv('CIRCUITPY_WIFI_PASSWORD')
+    config['api_key'] = os.getenv('ANTHROPIC_API_KEY')
+
+    # Load settings from settings.toml if available
+    if toml:
+        try:
+            with open('/settings.toml', 'r') as f:
+                settings = toml.load(f)
+                config.update({
+                    'camera_resolution': settings.get('camera', {}).get('resolution', 1),
+                    'auto_flash': settings.get('flash', {}).get('auto_flash_enabled', True),
+                    'flash_threshold': settings.get('flash', {}).get('dark_threshold', 30),
+                    'api_model': settings.get('api', {}).get('model', 'claude-3-5-sonnet-20241022'),
+                    'max_tokens': settings.get('api', {}).get('max_tokens', 1024),
+                    'api_timeout': settings.get('api', {}).get('timeout', 30),
+                    'max_retries': settings.get('network', {}).get('max_retries', 3),
+                    'retry_delay': settings.get('network', {}).get('retry_delay', 2),
+                    'prompts': settings.get('prompts', {})
+                })
+        except Exception as e:
+            print(f"⚠ Could not load settings.toml: {e}")
+            # Use defaults
+            config.update({
+                'camera_resolution': 1,
+                'auto_flash': True,
+                'flash_threshold': 30,
+                'api_model': 'claude-3-5-sonnet-20241022',
+                'max_tokens': 1024,
+                'api_timeout': 30,
+                'max_retries': 3,
+                'retry_delay': 2,
+                'prompts': {}
+            })
+
+    return config
 
 
-def initialize_wifi():
-    """
-    Connect to WiFi using credentials from secrets.toml.
+# ============================================
+# NETWORK FUNCTIONS
+# ============================================
 
-    This function demonstrates:
-    - Network error handling
-    - Retry logic with backoff
-    - Status reporting for debugging
-
-    Returns:
-        True if connected, False if failed
-    """
-    print(f"Connecting to WiFi: {settings.wifi_ssid}")
-
-    max_retries = settings.get("network.max_retries", 3)
-    retry_delay = settings.get("network.retry_delay", 2)
+def connect_wifi(ssid, password, max_retries=3, retry_delay=2):
+    """Connect to WiFi with retry logic"""
+    print(f"Connecting to WiFi: {ssid}")
 
     for attempt in range(max_retries):
         try:
-            wifi.radio.connect(
-                settings.wifi_ssid,
-                settings.wifi_password,
-                timeout=settings.get("network.connection_timeout", 10)
-            )
+            wifi.radio.connect(ssid, password, timeout=10)
             print(f"✓ Connected to WiFi")
             print(f"  IP Address: {wifi.radio.ipv4_address}")
             return True
-
         except Exception as e:
-            print(f"✗ WiFi connection attempt {attempt + 1}/{max_retries} failed: {e}")
+            print(f"✗ WiFi attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
                 print(f"  Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
-            else:
-                print("✗ Failed to connect to WiFi after all retries")
-                return False
 
     return False
 
 
-def initialize_requests():
-    """
-    Set up HTTPS requests handler.
-
-    This demonstrates proper setup of network resources in CircuitPython.
-
-    Returns:
-        adafruit_requests.Session object
-    """
-    print("Initializing HTTPS requests...")
-
+def create_requests_session():
+    """Create HTTPS requests session"""
     pool = socketpool.SocketPool(wifi.radio)
     ssl_context = ssl.create_default_context()
-    session = adafruit_requests.Session(pool, ssl_context)
-
-    print("✓ HTTPS requests ready")
-    return session
+    return adafruit_requests.Session(pool, ssl_context)
 
 
-def initialize_camera():
+# ============================================
+# CAMERA FUNCTIONS
+# ============================================
+
+def init_camera(resolution=1):
     """
-    Initialize camera with settings from settings.toml.
+    Initialize camera hardware.
+    Adjust this based on your specific camera module.
 
-    This function demonstrates:
-    - Hardware initialization
-    - Using configuration values
-    - Error handling for hardware
-
-    Note: This is a template - adjust for your specific camera module
+    Common resolutions:
+    0 = 240x240
+    1 = 320x240
+    2 = 640x480
     """
-    print("Initializing camera...")
+    print(f"Initializing camera (resolution: {resolution})...")
 
     try:
-        # Import camera library (adjust based on your hardware)
-        # import espcamera  # Example for ESP32-S3
-
-        # Configure camera with resolution from settings
-        # resolution = settings.camera_resolution
-
-        # Example configuration (adjust for your camera):
+        # TODO: Uncomment and adjust for your camera module
+        # Example for ESP32-S3 with camera:
+        # import espcamera
         # camera = espcamera.Camera(
         #     data_pins=board.CAMERA_DATA,
         #     external_clock_pin=board.CAMERA_XCLK,
@@ -161,118 +127,77 @@ def initialize_camera():
         #     frame_size=resolution,
         #     jpeg_quality=10,
         # )
-
-        print("✓ Camera initialized")
-        print(f"  Resolution: {settings.camera_resolution}")
+        # print("✓ Camera initialized")
         # return camera
-        return None  # Remove when implementing actual camera
+
+        print("⚠ Camera initialization not implemented - using placeholder")
+        return None
 
     except Exception as e:
         print(f"✗ Camera initialization failed: {e}")
         return None
 
 
-def initialize_display():
-    """
-    Initialize display if available.
-
-    This demonstrates optional hardware initialization.
-
-    Returns:
-        Display object if available, None otherwise
-    """
-    print("Initializing display...")
-
-    try:
-        display = board.DISPLAY
-        print(f"✓ Display ready ({display.width}x{display.height})")
-        return display
-    except AttributeError:
-        print("  No display available (this is okay)")
-        return None
-
-
-# ============================================
-# CORE FUNCTIONALITY
-# ============================================
-
 def capture_image(camera):
-    """
-    Capture an image from the camera.
-
-    Args:
-        camera: Camera object
-
-    Returns:
-        bytes: JPEG image data, or None if failed
-    """
-    print("Capturing image...")
-
+    """Capture image from camera"""
     if camera is None:
-        print("✗ No camera available")
+        print("⚠ No camera available - using placeholder")
         return None
 
     try:
-        # Check light level for auto-flash (if sensor available)
-        if settings.auto_flash_enabled:
-            # light_level = read_light_sensor()  # Implement based on your sensor
-            # if light_level < settings.dark_threshold:
-            #     enable_flash()
-            pass
-
-        # Capture image
-        # frame = camera.take()  # Adjust based on your camera API
+        print("Capturing image...")
+        # TODO: Adjust for your camera API
+        # frame = camera.take()
+        # print("✓ Image captured")
         # return frame
 
-        print("✓ Image captured")
-        return b"placeholder_image_data"  # Replace with actual capture
-
+        return None
     except Exception as e:
         print(f"✗ Image capture failed: {e}")
         return None
 
 
-def send_to_claude(image_data, prompt_config):
-    """
-    Send image to Claude API for analysis.
+# ============================================
+# AI VISION FUNCTIONS
+# ============================================
 
-    This function demonstrates:
-    - API request construction
-    - Error handling for network requests
-    - Timeout handling
-    - Response parsing
+def analyze_image(requests, image_data, prompt, api_key, model='claude-3-5-sonnet-20241022', max_tokens=1024):
+    """
+    Send image to Claude API for analysis
 
     Args:
-        image_data: JPEG image as bytes
-        prompt_config: Dict with 'label' and 'prompt' keys
+        requests: adafruit_requests session
+        image_data: JPEG image bytes
+        prompt: Text prompt for analysis
+        api_key: Anthropic API key
+        model: Claude model to use
+        max_tokens: Maximum response tokens
 
     Returns:
-        str: Claude's response text, or None if failed
+        str: Claude's response text
     """
-    print(f"Sending to Claude (mode: {prompt_config['label']})...")
+    print(f"Sending to Claude API...")
 
-    if requests is None:
-        print("✗ Requests not initialized")
-        return None
+    if image_data is None:
+        print("⚠ No image data - skipping API call")
+        return "No image data available for analysis"
 
     try:
-        # Prepare request
+        # Encode image as base64
+        import binascii
+        image_b64 = binascii.b2a_base64(image_data).decode('ascii').strip()
+
         url = "https://api.anthropic.com/v1/messages"
 
         headers = {
-            "x-api-key": settings.api_key,
+            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "content-type": "application/json"
         }
 
-        # Encode image as base64 (simplified - adjust as needed)
-        # In real implementation, use proper base64 encoding
-        # import binascii
-        # image_b64 = binascii.b2a_base64(image_data).decode('ascii').strip()
-
         payload = {
-            "model": settings.api_model,
-            "max_tokens": settings.max_tokens,
+            "model": model,
+            "max_tokens": max_tokens,
             "messages": [
                 {
                     "role": "user",
@@ -282,77 +207,28 @@ def send_to_claude(image_data, prompt_config):
                             "source": {
                                 "type": "base64",
                                 "media_type": "image/jpeg",
-                                # "data": image_b64  # Use actual base64 data
-                                "data": "placeholder"
+                                "data": image_b64
                             }
                         },
                         {
                             "type": "text",
-                            "text": prompt_config['prompt']
+                            "text": prompt
                         }
                     ]
                 }
             ]
         }
 
-        # Send request with timeout
-        timeout = settings.get("api.timeout", 30)
-        # response = requests.post(url, json=payload, headers=headers, timeout=timeout)
-
-        # Parse response
-        # response_data = response.json()
-        # text = response_data["content"][0]["text"]
-
-        # Placeholder response for demonstration
-        text = "This is a placeholder response. Implement actual API call."
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        response_data = response.json()
+        text = response_data["content"][0]["text"]
 
         print(f"✓ Response received ({len(text)} characters)")
         return text
 
     except Exception as e:
         print(f"✗ API request failed: {e}")
-        return None
-
-
-def display_response(display, text, prompt_label):
-    """
-    Display Claude's response on screen or serial.
-
-    Args:
-        display: Display object (or None)
-        text: Response text to display
-        prompt_label: Label for the prompt mode
-    """
-    print(f"\n{'=' * 40}")
-    print(f"Mode: {prompt_label}")
-    print(f"{'=' * 40}")
-    print(text)
-    print(f"{'=' * 40}\n")
-
-    if display is not None:
-        # Clear display and show response
-        # Implement text wrapping and display rendering based on your display
-        pass
-
-
-def cycle_prompt():
-    """
-    Move to the next prompt in the configured order.
-
-    This demonstrates:
-    - Circular iteration through a list
-    - Global state management
-    """
-    global current_prompt_index
-
-    prompt_order = settings.get_prompt_order()
-    current_prompt_index = (current_prompt_index + 1) % len(prompt_order)
-
-    current_prompt_name = prompt_order[current_prompt_index]
-    prompt_config = settings.get_prompt(current_prompt_name)
-
-    print(f"→ Switched to prompt: {prompt_config['label']}")
-    return prompt_config
+        return f"Error: {e}"
 
 
 # ============================================
@@ -360,88 +236,87 @@ def cycle_prompt():
 # ============================================
 
 def main():
-    """
-    Main program loop.
-
-    This demonstrates:
-    - Proper initialization order
-    - Error handling at each stage
-    - Clean program structure
-    - Event loop pattern
-    """
-    global settings, requests, current_prompt_index
+    """Main program loop"""
 
     print("\n" + "=" * 40)
-    print("CloudFX - AI Vision for CircuitPython")
-    print("Version 1.0")
+    print("CloudLens - AI Vision for CircuitPython")
     print("=" * 40 + "\n")
 
-    # Step 1: Load settings
-    settings = initialize_settings()
-    if settings is None:
-        print("\n✗ Cannot proceed without valid settings")
-        print("Please fix configuration and reset device")
+    # Load configuration
+    print("Loading configuration...")
+    config = load_config()
+
+    if not config.get('wifi_ssid') or not config.get('api_key'):
+        print("✗ Missing WiFi or API credentials in secrets.toml")
+        print("Please configure secrets.toml and reset device")
         while True:
             time.sleep(60)
 
-    # Step 2: Initialize WiFi
-    if not initialize_wifi():
-        print("\n✗ Cannot proceed without WiFi connection")
-        print("Please check credentials and reset device")
+    print("✓ Configuration loaded")
+
+    # Connect to WiFi
+    if not connect_wifi(
+        config['wifi_ssid'],
+        config['wifi_password'],
+        config.get('max_retries', 3),
+        config.get('retry_delay', 2)
+    ):
+        print("✗ Cannot proceed without WiFi")
         while True:
             time.sleep(60)
 
-    # Step 3: Initialize requests
-    requests = initialize_requests()
+    # Initialize requests
+    print("Initializing HTTPS...")
+    requests = create_requests_session()
+    print("✓ HTTPS ready")
 
-    # Step 4: Initialize hardware
-    camera = initialize_camera()
-    display = initialize_display()
+    # Initialize camera
+    camera = init_camera(config.get('camera_resolution', 1))
 
-    # Step 5: Get initial prompt
-    prompt_order = settings.get_prompt_order()
-    current_prompt_name = prompt_order[current_prompt_index]
-    current_prompt = settings.get_prompt(current_prompt_name)
+    # Default prompt if no settings.toml
+    default_prompt = "Describe this image in detail, focusing on what would be most useful for accessibility."
 
-    print(f"\n✓ Initialization complete")
-    print(f"  Starting with prompt: {current_prompt['label']}")
-    print(f"  {len(prompt_order)} total prompts configured\n")
+    print("\n✓ Initialization complete")
+    print("Ready for image capture!\n")
 
-    # Main event loop
-    print("Ready! Press button to capture (or waiting for input...)\n")
-
+    # Main loop
     while True:
         try:
-            # Wait for trigger (button press, etc.)
-            # In this example, we'll use a simple timer
-            # Replace with actual button/trigger detection
+            print("=" * 40)
+            print("Press button to capture (or waiting 10 seconds...)")
 
-            print("Waiting for capture trigger...")
-            time.sleep(5)  # Replace with button wait
+            # TODO: Replace with actual button detection
+            time.sleep(10)
 
-            # Capture and process
+            # Capture image
             image_data = capture_image(camera)
-            if image_data:
-                response = send_to_claude(image_data, current_prompt)
-                if response:
-                    display_response(display, response, current_prompt['label'])
 
-            # Optional: Auto-cycle through prompts
-            # current_prompt = cycle_prompt()
+            # Analyze with Claude
+            response = analyze_image(
+                requests,
+                image_data,
+                default_prompt,
+                config['api_key'],
+                config.get('api_model', 'claude-3-5-sonnet-20241022'),
+                config.get('max_tokens', 1024)
+            )
+
+            # Display response
+            print("\n" + "=" * 40)
+            print("CLAUDE RESPONSE:")
+            print("=" * 40)
+            print(response)
+            print("=" * 40 + "\n")
 
         except KeyboardInterrupt:
-            print("\n\nShutting down gracefully...")
+            print("\n\nShutting down...")
             break
-
         except Exception as e:
-            print(f"\n✗ Unexpected error in main loop: {e}")
+            print(f"\n✗ Error in main loop: {e}")
             print("Continuing after 5 seconds...")
             time.sleep(5)
 
 
-# ============================================
-# ENTRY POINT
-# ============================================
-
+# Entry point
 if __name__ == "__main__":
     main()
