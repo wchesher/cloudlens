@@ -77,6 +77,9 @@ class Config:
     SAVE_FULL_RESPONSES = os.getenv("SAVE_FULL_RESPONSES", "true").lower() == "true"
     BRIEF_MODE_LIMIT = int(os.getenv("BRIEF_MODE_LIMIT", "200"))
 
+    # Screensaver settings
+    SCREENSAVER_TIMEOUT = int(os.getenv("SCREENSAVER_TIMEOUT", "120"))  # Seconds of inactivity
+
     # Auto-flash settings
     AUTO_FLASH_ENABLED = os.getenv("AUTO_FLASH_ENABLED", "true").lower() == "true"
     DARK_THRESHOLD = int(os.getenv("DARK_THRESHOLD", "30"))
@@ -1053,6 +1056,83 @@ def change_quality_mode(pycam, quality_mode_index, quality_txt):
 
     return mode_info
 
+def show_loading_screen(pycam, message="Loading", max_dots=5):
+    """Display clean loading screen with animated dots
+
+    Args:
+        pycam: PyCamera instance
+        message: Base loading message
+        max_dots: Maximum number of dots to animate
+    """
+    try:
+        # Clear all existing display groups
+        while len(pycam.splash) > 0:
+            pycam.splash.pop()
+
+        # Hide built-in status bars
+        if hasattr(pycam, '_topbar'):
+            pycam._topbar.hidden = True
+        if hasattr(pycam, '_botbar'):
+            pycam._botbar.hidden = True
+
+        # Add CloudLens branding (top-left, same as viewfinder)
+        branding = label.Label(
+            terminalio.FONT,
+            text="CloudLens",
+            color=0x00FF00,
+            x=5,
+            y=18,
+            scale=2
+        )
+        pycam.splash.append(branding)
+
+        # Animate loading dots at bottom
+        loading_label = label.Label(
+            terminalio.FONT,
+            text="",
+            color=0x00DDFF,
+            x=5,
+            y=220,
+            scale=1
+        )
+        pycam.splash.append(loading_label)
+
+        # Animate dots
+        for i in range(max_dots):
+            dots = "." * (i + 1)
+            loading_label.text = f"{message}{dots}"
+            pycam.display.refresh()
+            time.sleep(0.3)
+
+        # Clear for "ready" message
+        while len(pycam.splash) > 0:
+            pycam.splash.pop()
+
+        # Show READY with branding
+        pycam.splash.append(branding)
+        ready_label = label.Label(
+            terminalio.FONT,
+            text="ready",
+            color=0x00FF00,
+            x=5,
+            y=220,
+            scale=2
+        )
+        pycam.splash.append(ready_label)
+        pycam.display.refresh()
+        time.sleep(1.0)
+
+        # Clear everything for normal operation
+        while len(pycam.splash) > 0:
+            pycam.splash.pop()
+
+        # Restore botbar visibility
+        if hasattr(pycam, '_botbar'):
+            pycam._botbar.hidden = False
+
+    except Exception as e:
+        logger.error("Loading screen error: {}", e)
+
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
@@ -1136,6 +1216,9 @@ def main():
 
     logger.info("Loaded {} prompts: {}", num_prompts, ", ".join(prompt_labels))
 
+    # Show clean loading screen with animated dots
+    show_loading_screen(pycam, "Loading", max_dots=5)
+
     prompt_index = 0
     quality_mode_index = Config.QUALITY_MODE_ORDER.index(quality_mode)
 
@@ -1176,9 +1259,9 @@ def main():
         terminalio.FONT,
         text=quality_to_stars(prompt_qualities[prompt_index]),
         color=0xFFD700,  # Gold color for stars
-        x=210,
+        x=200,
         y=220,
-        scale=1
+        scale=2
     )
 
     # Add CloudLens branding to top-left
@@ -1207,13 +1290,11 @@ def main():
     file_index = -1
     all_images = get_sorted_images()
 
-    # Show READY message to user
-    pycam.display_message("READY!", color=0x00FF00)
-    time.sleep(1.5)
+    # Screensaver state
+    screensaver_active = False
+    last_activity_time = time.monotonic()
 
-    # Clear READY message and start viewfinder
-    pycam.display.refresh()
-    time.sleep(0.3)  # Brief delay to ensure message is cleared
+    # System is now ready for operation
     system_ready = True
 
     logger.info("Ready! Controls:")
@@ -1244,6 +1325,36 @@ def main():
                     pass
 
             pycam.keys_debounce()
+
+            # Screensaver logic - turn off display after inactivity timeout
+            if Config.SCREENSAVER_TIMEOUT > 0:
+                current_time = time.monotonic()
+                elapsed = current_time - last_activity_time
+
+                # Check if any button was pressed
+                any_button_pressed = (pycam.shutter.short_count or pycam.shutter.long_press or
+                                     pycam.ok.fell or pycam.select.fell or
+                                     pycam.up.fell or pycam.down.fell or
+                                     pycam.left.fell or pycam.right.fell)
+
+                if any_button_pressed:
+                    last_activity_time = current_time
+                    if screensaver_active:
+                        # Wake up from screensaver
+                        pycam.display.brightness = 1.0
+                        screensaver_active = False
+                        logger.info("Screensaver deactivated - display on")
+                        continue  # Skip this iteration to avoid processing the wake-up button press
+
+                # Activate screensaver after timeout
+                if not screensaver_active and elapsed >= Config.SCREENSAVER_TIMEOUT:
+                    pycam.display.brightness = 0.0
+                    screensaver_active = True
+                    logger.info("Screensaver activated - display off after {}s inactivity", int(elapsed))
+
+                # If screensaver is active, skip all other logic
+                if screensaver_active:
+                    continue
 
             if not system_ready or not ready_message_cleared:
                 continue
@@ -1280,7 +1391,7 @@ def main():
                     pycam.capture_jpeg()
 
                     # IMMEDIATE feedback that photo was taken
-                    pycam.display_message("SNAP!", color=0x00FF00)
+                    pycam.display_message("snap", color=0x00FF00)
                     time.sleep(0.3)  # Brief confirmation
 
                     if flash_enabled:

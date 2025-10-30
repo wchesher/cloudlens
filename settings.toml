@@ -99,6 +99,12 @@ SAVE_FULL_RESPONSES = "true"  # Save complete responses to SD card as .txt files
 BRIEF_MODE_LIMIT = "200"      # Character limit for BRIEF mode truncation
 
 # ============================================
+# SCREENSAVER CONFIGURATION
+# ============================================
+
+SCREENSAVER_TIMEOUT = "120"   # Seconds of inactivity before screen turns off (0 to disable)
+
+# ============================================
 # PROMPT CONFIGURATION
 # ============================================
 
