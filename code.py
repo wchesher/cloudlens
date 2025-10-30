@@ -63,17 +63,17 @@ class Config:
     DEFAULT_QUALITY_MODE = os.getenv("DEFAULT_QUALITY_MODE", "MEDIUM")
     MAX_IMAGE_SIZE_KB = int(os.getenv("MAX_IMAGE_SIZE_KB", "3072"))
 
-    # Quality modes - read from settings.toml [quality.*] sections
+    # Quality modes - read from settings.toml flat structure
     @classmethod
     def _load_quality_mode(cls, mode_name):
         """Load a single quality mode from settings.toml"""
-        prefix = f"quality.{mode_name}."
+        prefix = f"quality_{mode_name}_"
         return {
             "resolution": int(os.getenv(f"{prefix}resolution", "3")),
             "label": os.getenv(f"{prefix}label", mode_name),
             "target_kb": int(os.getenv(f"{prefix}target_kb", "600")),
             "max_expected_kb": int(os.getenv(f"{prefix}max_expected_kb", "800")),
-            "icon": os.getenv(f"{prefix}icon", "◆")
+            "icon": os.getenv(f"{prefix}icon", "*")
         }
 
     @classmethod
@@ -772,6 +772,29 @@ def get_sorted_images():
         logger.error("Failed to list images: {}", e)
         return []
 
+def get_newest_image():
+    """Get the most recent image from SD card - FAST version for post-capture"""
+    try:
+        newest = None
+        newest_time = 0
+
+        for filename in os.listdir("/sd"):
+            if filename.lower().endswith(".jpg"):
+                filepath = f"/sd/{filename}"
+                try:
+                    stat = os.stat(filepath)
+                    mtime = stat[8]  # Modification time
+                    if mtime > newest_time:
+                        newest_time = mtime
+                        newest = filepath
+                except:
+                    pass
+
+        return newest
+    except Exception as e:
+        logger.error("Failed to get newest image: {}", e)
+        return None
+
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
@@ -875,6 +898,7 @@ def main():
 
     # Application state
     system_ready = False
+    ready_message_cleared = False  # Track when READY message is fully cleared
     showing_captured_image = False
     view_mode = False
     browse_mode = False
@@ -884,7 +908,10 @@ def main():
     # Show READY message to user
     pycam.display_message("READY!", color=0x00FF00)
     time.sleep(1.5)
+
+    # Clear READY message and start viewfinder
     pycam.display.refresh()
+    time.sleep(0.3)  # Brief delay to ensure message is cleared
     system_ready = True
 
     logger.info("Ready! Controls:")
@@ -908,15 +935,18 @@ def main():
                     frame = pycam.continuous_capture()
                     if frame and hasattr(frame, 'width') and hasattr(frame, 'height'):
                         pycam.blit(frame)
+                        # Mark READY message as cleared after first frame
+                        if not ready_message_cleared:
+                            ready_message_cleared = True
                 except Exception as e:
                     pass
 
             pycam.keys_debounce()
 
-            if not system_ready:
+            if not system_ready or not ready_message_cleared:
                 continue
 
-            # SHUTTER BUTTON
+            # SHUTTER BUTTON - Now blocked until READY message is cleared and viewfinder running
             if pycam.shutter.long_press and not view_mode:
                 logger.info("Autofocus triggered")
                 pycam.autofocus()
@@ -941,17 +971,21 @@ def main():
 
                     pycam.capture_jpeg()
 
+                    # IMMEDIATE feedback that photo was taken
+                    pycam.display_message("SNAP!", color=0x00FF00)
+                    time.sleep(0.3)  # Brief confirmation
+
                     if flash_enabled:
                         pycam.led_level = 0
                         logger.info("Flash disabled")
 
-                    all_images = get_sorted_images()
-                    if not all_images:
+                    # FAST: Get newest image by modification time (no sorting)
+                    the_image = get_newest_image()
+                    if not the_image:
                         pycam.display_message("No images", color=0xFF0000)
                         time.sleep(Config.MSG_DURATION)
                         continue
 
-                    the_image = all_images[-1]
                     filename_only = the_image.split('/')[-1]
                     logger.info("Captured: {}", filename_only)
 
@@ -965,9 +999,7 @@ def main():
 
                     showing_captured_image = True
 
-                    show_status_overlay(pycam, f"{size_kb}KB captured", 0x00FF00)
-                    time.sleep(0.8)
-
+                    # Immediate send - no delay
                     show_status_overlay(pycam, "Sending to Claude...", 0x00DDDD)
 
                     success, response = send_to_claude(
