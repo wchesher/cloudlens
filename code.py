@@ -107,23 +107,29 @@ class Config:
     QUALITY_MODES = None  # Will be loaded dynamically
     QUALITY_MODE_ORDER = ["LOW", "MEDIUM", "HIGH", "ULTRA"]
 
+    # Resolution mapping for display
+    RESOLUTION_MAP = {
+        0: "240x240", 1: "320x240", 2: "640x480", 3: "800x600",
+        4: "1024x768", 5: "1280x720", 6: "1280x1024", 7: "1600x1200",
+        8: "1920x1080", 9: "2048x1536", 10: "2560x1440", 11: "2560x1600",
+        12: "2560x1920"
+    }
+
     @classmethod
     def validate_camera_resolution(cls):
         """Validate and log camera resolution"""
-        res_info = {
-            0: "240x240", 1: "320x240", 2: "640x480", 3: "800x600",
-            4: "1024x768", 5: "1280x720", 6: "1280x1024", 7: "1600x1200",
-            8: "1920x1080", 9: "2048x1536", 10: "2560x1440", 11: "2560x1600",
-            12: "2560x1920"
-        }
-
-        if cls.CAMERA_RESOLUTION in res_info:
-            print(f"[INFO] Camera resolution: {cls.CAMERA_RESOLUTION} = {res_info[cls.CAMERA_RESOLUTION]}")
+        if cls.CAMERA_RESOLUTION in cls.RESOLUTION_MAP:
+            print(f"[INFO] Camera resolution: {cls.CAMERA_RESOLUTION} = {cls.RESOLUTION_MAP[cls.CAMERA_RESOLUTION]}")
         else:
             print(f"[WARN] Invalid resolution {cls.CAMERA_RESOLUTION}, using default 3")
             cls.CAMERA_RESOLUTION = 3
 
         return cls.CAMERA_RESOLUTION
+
+    @classmethod
+    def get_resolution_string(cls, resolution_code):
+        """Get resolution string for display"""
+        return cls.RESOLUTION_MAP.get(resolution_code, "???x???")
 
     @classmethod
     def get_quality_mode_info(cls, mode_name):
@@ -844,13 +850,18 @@ def check_sd_card():
     except (OSError, RuntimeError):
         return False
 
-def change_quality_mode(pycam, quality_mode_index, quality_txt):
+def change_quality_mode(pycam, quality_mode_index, quality_txt, resolution_txt=None):
     """Change quality mode and update display - consolidated function"""
     current_mode = Config.QUALITY_MODE_ORDER[quality_mode_index]
     mode_info = Config.get_quality_mode_info(current_mode)
 
     pycam.resolution = mode_info["resolution"]
     quality_txt.text = f"{mode_info['icon']} {mode_info['label']}"
+
+    # Update resolution display if provided
+    if resolution_txt:
+        resolution_txt.text = Config.get_resolution_string(mode_info["resolution"])
+
     pycam.display.refresh()
 
     logger.info("Quality: {} {} (~{}KB, max ~{}KB)",
@@ -963,9 +974,43 @@ def main():
         scale=1
     )
 
+    # Add CloudLens branding to top-left
+    branding_txt = label.Label(
+        terminalio.FONT,
+        text="CloudLens",
+        color=0x00FF00,
+        x=5,
+        y=8,
+        scale=1
+    )
+
+    # Add resolution display to top-right
+    resolution_str = Config.get_resolution_string(mode_info["resolution"])
+    resolution_txt = label.Label(
+        terminalio.FONT,
+        text=resolution_str,
+        color=0x888888,
+        x=180,
+        y=8,
+        scale=1
+    )
+
+    # Add SD card status indicator (top-left, below branding)
+    sd_status_txt = label.Label(
+        terminalio.FONT,
+        text="SD",
+        color=0x00FF00 if check_sd_card() else 0xFF0000,
+        x=5,
+        y=18,
+        scale=1
+    )
+
     pycam._botbar.append(rect)
     pycam._botbar.append(prompt_txt)
     pycam.splash.append(quality_txt)
+    pycam.splash.append(branding_txt)
+    pycam.splash.append(resolution_txt)
+    pycam.splash.append(sd_status_txt)
     pycam.display.refresh()
 
     # Application state
@@ -1122,14 +1167,14 @@ def main():
                     text_viewer.scroll_up()
                 elif not browse_mode:
                     quality_mode_index = (quality_mode_index + 1) % len(Config.QUALITY_MODE_ORDER)
-                    mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt)
+                    mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt, resolution_txt)
 
             if pycam.down.fell:
                 if view_mode:
                     text_viewer.scroll_down()
                 elif not browse_mode:
                     quality_mode_index = (quality_mode_index - 1) % len(Config.QUALITY_MODE_ORDER)
-                    mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt)
+                    mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt, resolution_txt)
 
             # LEFT/RIGHT - Navigate
             if pycam.right.fell:
