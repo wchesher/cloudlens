@@ -1218,14 +1218,14 @@ def main():
     prompt_index = 0
     quality_mode_index = Config.QUALITY_MODE_ORDER.index(quality_mode)
 
-    # Add prompt mode indicator to lower-left corner (same as other UI elements)
+    # Add prompt mode indicator - TEST: center screen, bright red, large
     prompt_txt = label.Label(
         terminalio.FONT,
         text=prompt_labels[prompt_index],
-        color=0x00DDFF,
-        x=5,
-        y=220,
-        scale=2
+        color=0xFF0000,  # BRIGHT RED for testing
+        x=60,
+        y=120,
+        scale=3  # LARGE for testing
     )
 
     # Add image quality mode indicator to upper-right corner
@@ -1263,21 +1263,24 @@ def main():
         scale=2
     )
 
-    # Start live preview mode first
+    # Add all UI elements BEFORE starting live preview
+    logger.info("Adding UI elements to splash BEFORE live preview")
+    pycam.splash.append(branding_txt)       # Upper-left
+    pycam.splash.append(quality_txt)        # Upper-right
+    pycam.splash.append(prompt_txt)         # CENTER RED (test)
+    pycam.splash.append(prompt_quality_txt) # Lower-right
+    pycam.display.refresh()
+
+    logger.info("Splash now has {} elements", len(pycam.splash))
+
+    # Now start live preview mode
     try:
         pycam.live_preview_mode()
-        logger.info("Preview mode started")
+        logger.info("Preview mode started, splash now has {} elements", len(pycam.splash))
     except (RuntimeError, AttributeError) as e:
         logger.warn("Could not start preview mode: {}", e)
 
-    # Add all UI elements directly to splash (not _botbar)
-    logger.info("Adding UI elements to splash")
-    pycam.splash.append(branding_txt)       # Upper-left
-    pycam.splash.append(quality_txt)        # Upper-right
-    pycam.splash.append(prompt_txt)         # Lower-left
-    pycam.splash.append(prompt_quality_txt) # Lower-right
-
-    logger.info("Refreshing display")
+    logger.info("Final refresh")
     pycam.display.refresh()
 
     logger.info("UI setup complete - mode: {}, stars: {}",
