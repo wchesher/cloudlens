@@ -642,12 +642,14 @@ class TextViewer:
             self.current_prompt_label = prompt_label
             self.is_active = True
 
-            wrapped_text = "\n".join(wrap_text_to_lines(text, Config.TEXT_WRAP_WIDTH))
-
+            # For haiku, preserve original line structure without wrapping
             if "haiku" in prompt_label.lower():
-                wrapped_text = wrapped_text.replace("*", "\n")
-
-            self.lines = wrapped_text.split('\n')
+                formatted_text = text.replace("*", "\n")
+                self.lines = formatted_text.split('\n')
+            else:
+                # Normal text: wrap to screen width
+                wrapped_text = "\n".join(wrap_text_to_lines(text, Config.TEXT_WRAP_WIDTH))
+                self.lines = wrapped_text.split('\n')
 
             self.rectangle = vectorio.Rectangle(
                 pixel_shader=self.palette,
