@@ -772,6 +772,29 @@ def get_sorted_images():
         logger.error("Failed to list images: {}", e)
         return []
 
+def get_newest_image():
+    """Get the most recent image from SD card - FAST version for post-capture"""
+    try:
+        newest = None
+        newest_time = 0
+
+        for filename in os.listdir("/sd"):
+            if filename.lower().endswith(".jpg"):
+                filepath = f"/sd/{filename}"
+                try:
+                    stat = os.stat(filepath)
+                    mtime = stat[8]  # Modification time
+                    if mtime > newest_time:
+                        newest_time = mtime
+                        newest = filepath
+                except:
+                    pass
+
+        return newest
+    except Exception as e:
+        logger.error("Failed to get newest image: {}", e)
+        return None
+
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
@@ -948,17 +971,21 @@ def main():
 
                     pycam.capture_jpeg()
 
+                    # IMMEDIATE feedback that photo was taken
+                    pycam.display_message("SNAP!", color=0x00FF00)
+                    time.sleep(0.3)  # Brief confirmation
+
                     if flash_enabled:
                         pycam.led_level = 0
                         logger.info("Flash disabled")
 
-                    all_images = get_sorted_images()
-                    if not all_images:
+                    # FAST: Get newest image by modification time (no sorting)
+                    the_image = get_newest_image()
+                    if not the_image:
                         pycam.display_message("No images", color=0xFF0000)
                         time.sleep(Config.MSG_DURATION)
                         continue
 
-                    the_image = all_images[-1]
                     filename_only = the_image.split('/')[-1]
                     logger.info("Captured: {}", filename_only)
 
@@ -972,9 +999,7 @@ def main():
 
                     showing_captured_image = True
 
-                    show_status_overlay(pycam, f"{size_kb}KB captured", 0x00FF00)
-                    time.sleep(0.8)
-
+                    # Immediate send - no delay
                     show_status_overlay(pycam, "Sending to Claude...", 0x00DDDD)
 
                     success, response = send_to_claude(
