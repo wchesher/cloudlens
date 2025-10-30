@@ -1053,6 +1053,83 @@ def change_quality_mode(pycam, quality_mode_index, quality_txt):
 
     return mode_info
 
+def show_loading_screen(pycam, message="Loading", max_dots=5):
+    """Display clean loading screen with animated dots
+
+    Args:
+        pycam: PyCamera instance
+        message: Base loading message
+        max_dots: Maximum number of dots to animate
+    """
+    try:
+        # Clear all existing display groups
+        while len(pycam.splash) > 0:
+            pycam.splash.pop()
+
+        # Hide built-in status bars
+        if hasattr(pycam, '_topbar'):
+            pycam._topbar.hidden = True
+        if hasattr(pycam, '_botbar'):
+            pycam._botbar.hidden = True
+
+        # Add CloudLens branding (top-left, same as viewfinder)
+        branding = label.Label(
+            terminalio.FONT,
+            text="CloudLens",
+            color=0x00FF00,
+            x=5,
+            y=18,
+            scale=2
+        )
+        pycam.splash.append(branding)
+
+        # Animate loading dots at bottom
+        loading_label = label.Label(
+            terminalio.FONT,
+            text="",
+            color=0x00DDFF,
+            x=5,
+            y=220,
+            scale=1
+        )
+        pycam.splash.append(loading_label)
+
+        # Animate dots
+        for i in range(max_dots):
+            dots = "." * (i + 1)
+            loading_label.text = f"{message}{dots}"
+            pycam.display.refresh()
+            time.sleep(0.3)
+
+        # Clear for "ready" message
+        while len(pycam.splash) > 0:
+            pycam.splash.pop()
+
+        # Show READY with branding
+        pycam.splash.append(branding)
+        ready_label = label.Label(
+            terminalio.FONT,
+            text="ready",
+            color=0x00FF00,
+            x=5,
+            y=220,
+            scale=2
+        )
+        pycam.splash.append(ready_label)
+        pycam.display.refresh()
+        time.sleep(1.0)
+
+        # Clear everything for normal operation
+        while len(pycam.splash) > 0:
+            pycam.splash.pop()
+
+        # Restore botbar visibility
+        if hasattr(pycam, '_botbar'):
+            pycam._botbar.hidden = False
+
+    except Exception as e:
+        logger.error("Loading screen error: {}", e)
+
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
@@ -1136,6 +1213,9 @@ def main():
 
     logger.info("Loaded {} prompts: {}", num_prompts, ", ".join(prompt_labels))
 
+    # Show clean loading screen with animated dots
+    show_loading_screen(pycam, "Loading", max_dots=5)
+
     prompt_index = 0
     quality_mode_index = Config.QUALITY_MODE_ORDER.index(quality_mode)
 
@@ -1176,9 +1256,9 @@ def main():
         terminalio.FONT,
         text=quality_to_stars(prompt_qualities[prompt_index]),
         color=0xFFD700,  # Gold color for stars
-        x=210,
+        x=200,
         y=220,
-        scale=1
+        scale=2
     )
 
     # Add CloudLens branding to top-left
@@ -1207,13 +1287,7 @@ def main():
     file_index = -1
     all_images = get_sorted_images()
 
-    # Show READY message to user
-    pycam.display_message("READY!", color=0x00FF00)
-    time.sleep(1.5)
-
-    # Clear READY message and start viewfinder
-    pycam.display.refresh()
-    time.sleep(0.3)  # Brief delay to ensure message is cleared
+    # System is now ready for operation
     system_ready = True
 
     logger.info("Ready! Controls:")
@@ -1280,7 +1354,7 @@ def main():
                     pycam.capture_jpeg()
 
                     # IMMEDIATE feedback that photo was taken
-                    pycam.display_message("SNAP!", color=0x00FF00)
+                    pycam.display_message("snap", color=0x00FF00)
                     time.sleep(0.3)  # Brief confirmation
 
                     if flash_enabled:
