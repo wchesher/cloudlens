@@ -914,6 +914,15 @@ def main():
         pycam.resolution = mode_info["resolution"]
 
         pycam.effect = 0
+
+        # Hide PyCamera's built-in status displays (resolution, SD status, etc.)
+        try:
+            if hasattr(pycam, '_topbar'):
+                pycam._topbar.hidden = True
+                logger.info("PyCamera built-in status bar hidden")
+        except (AttributeError, RuntimeError):
+            pass
+
         logger.info("Camera ready")
         logger.info("Quality mode: {} (resolution {})", quality_mode, mode_info["resolution"])
     except Exception as e:
