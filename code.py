@@ -1218,14 +1218,14 @@ def main():
     prompt_index = 0
     quality_mode_index = Config.QUALITY_MODE_ORDER.index(quality_mode)
 
-    # Add prompt mode indicator - TEST: center screen, bright red, large
+    # Add prompt mode indicator to lower-left corner
     prompt_txt = label.Label(
         terminalio.FONT,
         text=prompt_labels[prompt_index],
-        color=0xFF0000,  # BRIGHT RED for testing
-        x=60,
-        y=120,
-        scale=3  # LARGE for testing
+        color=0x00DDFF,
+        x=5,
+        y=220,
+        scale=2
     )
 
     # Add image quality mode indicator to upper-right corner
@@ -1263,29 +1263,25 @@ def main():
         scale=2
     )
 
-    # Add all UI elements BEFORE starting live preview
-    logger.info("Adding UI elements to splash BEFORE live preview")
-    pycam.splash.append(branding_txt)       # Upper-left
-    pycam.splash.append(quality_txt)        # Upper-right
-    pycam.splash.append(prompt_txt)         # CENTER RED (test)
-    pycam.splash.append(prompt_quality_txt) # Lower-right
-    pycam.display.refresh()
-
-    logger.info("Splash now has {} elements", len(pycam.splash))
-
-    # Now start live preview mode
+    # Start live preview mode FIRST (it clears splash!)
     try:
         pycam.live_preview_mode()
-        logger.info("Preview mode started, splash now has {} elements", len(pycam.splash))
+        logger.info("Preview mode started")
     except (RuntimeError, AttributeError) as e:
         logger.warn("Could not start preview mode: {}", e)
 
-    logger.info("Final refresh")
+    # NOW add all UI elements AFTER live preview (so they overlay on camera)
+    logger.info("Adding UI elements to splash AFTER live preview")
+    pycam.splash.append(branding_txt)       # Upper-left
+    pycam.splash.append(quality_txt)        # Upper-right
+    pycam.splash.append(prompt_txt)         # Lower-left
+    pycam.splash.append(prompt_quality_txt) # Lower-right
     pycam.display.refresh()
 
-    logger.info("UI setup complete - mode: {}, stars: {}",
+    logger.info("UI setup complete - mode: {}, stars: {}, splash elements: {}",
                 prompt_labels[prompt_index],
-                quality_to_stars(prompt_qualities[prompt_index]))
+                quality_to_stars(prompt_qualities[prompt_index]),
+                len(pycam.splash))
 
     # Application state
     system_ready = False
