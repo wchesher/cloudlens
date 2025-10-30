@@ -72,6 +72,11 @@ class Config:
     TEXT_Y_POSITION = int(os.getenv("TEXT_Y_POSITION", "20"))
     MSG_DURATION = float(os.getenv("MSG_DURATION", "0.5"))
 
+    # Response display settings
+    DEFAULT_VERBOSITY = os.getenv("DEFAULT_VERBOSITY", "BRIEF")
+    SAVE_FULL_RESPONSES = os.getenv("SAVE_FULL_RESPONSES", "true").lower() == "true"
+    BRIEF_MODE_LIMIT = int(os.getenv("BRIEF_MODE_LIMIT", "200"))
+
     # Auto-flash settings
     AUTO_FLASH_ENABLED = os.getenv("AUTO_FLASH_ENABLED", "true").lower() == "true"
     DARK_THRESHOLD = int(os.getenv("DARK_THRESHOLD", "30"))
@@ -150,15 +155,16 @@ class Config:
 
     @classmethod
     def get_prompts(cls):
-        """Dynamically load ALL prompts from settings.toml"""
+        """Dynamically load ALL prompts from settings.toml including quality ratings"""
         prompts = []
         labels = []
+        qualities = []
 
         prompt_order = cls.PROMPT_ORDER
 
         if not prompt_order:
             print("[ERROR] PROMPT_ORDER not found in settings.toml")
-            return [], []
+            return [], [], []
 
         prompt_names = [name.strip() for name in prompt_order.split(',')]
         print(f"[INFO] Loading {len(prompt_names)} prompts...")
@@ -166,18 +172,21 @@ class Config:
         for prompt_name in prompt_names:
             prompt_var = f"{prompt_name}_PROMPT"
             label_var = f"{prompt_name}_LABEL"
+            quality_var = f"{prompt_name}_QUALITY"
 
             prompt_text = os.getenv(prompt_var)
             label_text = os.getenv(label_var)
+            quality_text = os.getenv(quality_var, "1")  # Default to quality 1
 
             if prompt_text:
                 prompts.append(prompt_text)
                 labels.append(label_text if label_text else prompt_name)
-                print(f"[INFO]   ✓ {prompt_name}")
+                qualities.append(int(quality_text))
+                print(f"[INFO]   ✓ {prompt_name} (Quality {quality_text})")
             else:
                 print(f"[WARN]   ✗ {prompt_var} not found")
 
-        return prompts, labels
+        return prompts, labels, qualities
 
     @classmethod
     def validate(cls):
@@ -192,7 +201,7 @@ class Config:
         elif not cls.ANTHROPIC_API_KEY.startswith("sk-ant-"):
             issues.append("Invalid ANTHROPIC_API_KEY format")
 
-        prompts, labels = cls.get_prompts()
+        prompts, labels, qualities = cls.get_prompts()
         if len(prompts) == 0:
             issues.append("No prompts found in settings.toml")
 
@@ -383,6 +392,78 @@ def encode_image(image_path):
     except Exception as e:
         logger.error("Encode failed: {}", e)
         return None
+
+def create_brief_response(full_response, prompt_label):
+    """Create intelligent brief version of response for display
+
+    Args:
+        full_response: Complete response from Claude
+        prompt_label: Label of the prompt used
+
+    Returns:
+        Truncated version suitable for quick viewing
+    """
+    try:
+        # Prompts that should NEVER be truncated (already naturally brief)
+        no_truncate = ["HAIKU", "PLANT", "MOVIE", "TRANSLATE", "WEIRD"]
+        if any(p in prompt_label.upper() for p in no_truncate):
+            return full_response
+
+        limit = Config.BRIEF_MODE_LIMIT
+
+        # If already brief enough, return as-is
+        if len(full_response) <= limit:
+            return full_response
+
+        # Strategy 1: First paragraph
+        paragraphs = full_response.split('\n\n')
+        if paragraphs and len(paragraphs[0]) <= limit:
+            return paragraphs[0] + "\n\n[↑ UP for full response]"
+
+        # Strategy 2: First 2 sentences
+        sentences = full_response.split('. ')
+        if len(sentences) >= 2:
+            brief = '. '.join(sentences[:2]) + '.'
+            if len(brief) <= limit + 50:  # Allow slight overflow for sentence completion
+                return brief + "\n\n[↑ UP for full response]"
+
+        # Strategy 3: Hard truncate at last sentence boundary before limit
+        truncated = full_response[:limit]
+        last_period = truncated.rfind('. ')
+        if last_period > 100:  # Don't cut too short
+            truncated = truncated[:last_period + 1]
+        else:
+            truncated = truncated + "..."
+
+        return truncated + "\n\n[↑ UP for full response]"
+
+    except Exception as e:
+        logger.error("Failed to create brief response: {}", e)
+        return full_response  # Fall back to full response
+
+def save_response_to_sd(image_path, response, prompt_label):
+    """Save full response alongside image on SD card
+
+    Args:
+        image_path: Path to the image file (e.g., /sd/image_001.jpg)
+        response: Complete response text to save
+        prompt_label: Label of the prompt used
+    """
+    try:
+        # Convert image_001.jpg → image_001_response.txt
+        base_name = image_path.replace('.jpg', '').replace('.JPG', '')
+        response_file = f"{base_name}_response.txt"
+
+        with open(response_file, 'w') as f:
+            f.write(f"Prompt: {prompt_label}\n")
+            f.write(f"Image: {image_path}\n")
+            f.write("-" * 40 + "\n\n")
+            f.write(response)
+
+        logger.info("Saved response to {}", response_file)
+
+    except Exception as e:
+        logger.error("Failed to save response to SD: {}", e)
 
 def send_to_claude(requests_session, image_path, prompt, prompt_label, pycam=None):
     """Send image to Claude API with cancellation support
@@ -633,24 +714,28 @@ class TextViewer:
         self.page_indicator = None
         self.is_active = False
         self.current_prompt_label = ""
+        # Verbosity toggle support
+        self.response_brief = ""
+        self.response_verbose = ""
+        self.current_verbosity = Config.DEFAULT_VERBOSITY
 
-    def show(self, text, prompt_label):
-        """Display text with scrolling support"""
+    def show(self, response_brief, response_verbose, prompt_label):
+        """Display text with scrolling support and verbosity toggle
+
+        Args:
+            response_brief: Truncated version for quick viewing
+            response_verbose: Full response text
+            prompt_label: Label of the prompt used
+        """
         try:
-            self.full_text = text
-            self.scroll_pos = 0
+            self.response_brief = response_brief
+            self.response_verbose = response_verbose
             self.current_prompt_label = prompt_label
+            self.current_verbosity = Config.DEFAULT_VERBOSITY
+            self.scroll_pos = 0
             self.is_active = True
 
-            # For haiku, preserve original line structure without wrapping
-            if "haiku" in prompt_label.lower():
-                formatted_text = text.replace("*", "\n")
-                self.lines = formatted_text.split('\n')
-            else:
-                # Normal text: wrap to screen width
-                wrapped_text = "\n".join(wrap_text_to_lines(text, Config.TEXT_WRAP_WIDTH))
-                self.lines = wrapped_text.split('\n')
-
+            # Create rectangle for black background
             self.rectangle = vectorio.Rectangle(
                 pixel_shader=self.palette,
                 width=240,
@@ -660,13 +745,56 @@ class TextViewer:
             )
             self.pycam.splash.append(self.rectangle)
 
-            self._render_page()
+            # Render the default verbosity
+            self._render_current_verbosity()
 
-            logger.info("Text viewer active - {} lines total", len(self.lines))
+            mode_indicator = "[V]" if self.current_verbosity == "VERBOSE" else "[B]"
+            logger.info("Text viewer active {} - {} lines total", mode_indicator, len(self.lines))
 
         except Exception as e:
             logger.error("Failed to display text: {}", e)
             self.is_active = False
+
+    def toggle_verbosity(self):
+        """Toggle between BRIEF and VERBOSE display modes"""
+        if not self.is_active:
+            return
+
+        if self.current_verbosity == "BRIEF":
+            self.current_verbosity = "VERBOSE"
+            logger.info("Switched to VERBOSE mode")
+        else:
+            self.current_verbosity = "BRIEF"
+            logger.info("Switched to BRIEF mode")
+
+        self.scroll_pos = 0  # Reset scroll position
+        self._render_current_verbosity()
+
+    def _render_current_verbosity(self):
+        """Render the currently selected verbosity level"""
+        try:
+            # Choose which text to display
+            if self.current_verbosity == "VERBOSE":
+                display_text = self.response_verbose
+            else:
+                display_text = self.response_brief
+
+            # Store for reference
+            self.full_text = display_text
+
+            # For haiku, preserve original line structure without wrapping
+            if "haiku" in self.current_prompt_label.lower():
+                formatted_text = display_text.replace("*", "\n")
+                self.lines = formatted_text.split('\n')
+            else:
+                # Normal text: wrap to screen width
+                wrapped_text = "\n".join(wrap_text_to_lines(display_text, Config.TEXT_WRAP_WIDTH))
+                self.lines = wrapped_text.split('\n')
+
+            self._render_page()
+
+        except Exception as e:
+            logger.error("Failed to render verbosity: {}", e)
 
     def _render_page(self):
         """Render the current page of text"""
@@ -699,18 +827,21 @@ class TextViewer:
             total_pages = max(1, (len(self.lines) + self.lines_per_page - 1) // self.lines_per_page)
             current_page = min(total_pages, (self.scroll_pos // self.lines_per_page) + 1)
 
+            # Add verbosity indicator
+            mode_indicator = "[V]" if self.current_verbosity == "VERBOSE" else "[B]"
+
             if total_pages > 1:
                 can_go_up = self.scroll_pos > 0
                 can_go_down = (self.scroll_pos + self.lines_per_page) < len(self.lines)
 
                 if can_go_up and can_go_down:
-                    indicator_text = "Go Up or Down"
+                    indicator_text = f"{mode_indicator} Up/Down"
                 elif can_go_up:
-                    indicator_text = "Go Up"
+                    indicator_text = f"{mode_indicator} Go Up"
                 elif can_go_down:
-                    indicator_text = "Go Down"
+                    indicator_text = f"{mode_indicator} Go Down"
                 else:
-                    indicator_text = f"Page {current_page}/{total_pages}"
+                    indicator_text = f"{mode_indicator} Pg {current_page}/{total_pages}"
 
                 self.page_indicator = label.Label(
                     terminalio.FONT,
@@ -722,9 +853,11 @@ class TextViewer:
                 )
                 self.pycam.splash.append(self.page_indicator)
             else:
+                # Single page - show verbosity and hint
+                indicator_text = f"{mode_indicator} UP=toggle OK=close"
                 self.page_indicator = label.Label(
                     terminalio.FONT,
-                    text="OK to close",
+                    text=indicator_text,
                     color=0x00FF00,
                     x=5,
                     y=232,
@@ -994,7 +1127,7 @@ def main():
     text_viewer = TextViewer(pycam)
 
     # Load prompts dynamically from config
-    prompts, prompt_labels = Config.get_prompts()
+    prompts, prompt_labels, prompt_qualities = Config.get_prompts()
     num_prompts = len(prompts)
 
     if num_prompts == 0:
@@ -1023,12 +1156,27 @@ def main():
         scale=2
     )
 
-    # Add quality mode indicator to lower-right corner
+    # Add image quality mode indicator to upper-right corner
     quality_txt = label.Label(
         terminalio.FONT,
         text=f"{mode_info['icon']} {mode_info['label']}",
         color=0x00DDFF,
         x=140,
+        y=18,
+        scale=1
+    )
+
+    # Add prompt quality indicator to lower-right corner (stars)
+    def quality_to_stars(quality):
+        """Convert quality number (1-3) to star representation"""
+        star_map = {1: "*", 2: "**", 3: "***"}
+        return star_map.get(quality, "*")
+
+    prompt_quality_txt = label.Label(
+        terminalio.FONT,
+        text=quality_to_stars(prompt_qualities[prompt_index]),
+        color=0xFFD700,  # Gold color for stars
+        x=210,
         y=220,
         scale=1
     )
@@ -1046,6 +1194,7 @@ def main():
     pycam._botbar.append(rect)
     pycam._botbar.append(prompt_txt)
     pycam.splash.append(quality_txt)
+    pycam.splash.append(prompt_quality_txt)
     pycam.splash.append(branding_txt)
     pycam.display.refresh()
 
@@ -1175,9 +1324,20 @@ def main():
 
                     if success:
                         clear_status_overlay(pycam)
-                        text_viewer.show(response, prompt_labels[prompt_index])
+
+                        # Create both brief and verbose versions
+                        response_brief = create_brief_response(response, prompt_labels[prompt_index])
+                        response_verbose = response
+
+                        # Save full response to SD card
+                        if Config.SAVE_FULL_RESPONSES:
+                            save_response_to_sd(the_image, response_verbose, prompt_labels[prompt_index])
+
+                        # Show with toggle capability
+                        text_viewer.show(response_brief, response_verbose, prompt_labels[prompt_index])
                         view_mode = True
-                        del response  # Free memory
+
+                        del response, response_brief, response_verbose  # Free memory
                         gc.collect()
                     else:
                         clear_status_overlay(pycam)
@@ -1206,14 +1366,15 @@ def main():
                     time.sleep(Config.MSG_DURATION)
                     gc.collect()
 
-            # UP/DOWN - Scroll text OR change quality mode
+            # UP - Toggle verbosity in text view OR change quality mode
             if pycam.up.fell:
                 if view_mode:
-                    text_viewer.scroll_up()
+                    text_viewer.toggle_verbosity()
                 elif not browse_mode:
                     quality_mode_index = (quality_mode_index + 1) % len(Config.QUALITY_MODE_ORDER)
                     mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt)
 
+            # DOWN - Scroll text down OR change quality mode
             if pycam.down.fell:
                 if view_mode:
                     text_viewer.scroll_down()
@@ -1231,8 +1392,10 @@ def main():
                     # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index + 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
+                    prompt_quality_txt.text = quality_to_stars(prompt_qualities[prompt_index])
                     pycam.display.refresh()
-                    logger.info("Prompt: {}", prompt_labels[prompt_index])
+                    logger.info("Prompt: {} (Quality {})", prompt_labels[prompt_index],
+                               prompt_qualities[prompt_index])
 
             if pycam.left.fell:
                 if browse_mode:
@@ -1243,8 +1406,10 @@ def main():
                     # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index - 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
+                    prompt_quality_txt.text = quality_to_stars(prompt_qualities[prompt_index])
                     pycam.display.refresh()
-                    logger.info("Prompt: {}", prompt_labels[prompt_index])
+                    logger.info("Prompt: {} (Quality {})", prompt_labels[prompt_index],
+                               prompt_qualities[prompt_index])
 
             # SELECT - Browse mode
             if pycam.select.fell:
@@ -1302,9 +1467,20 @@ def main():
                     if success:
                         browse_mode = False
                         clear_status_overlay(pycam)
-                        text_viewer.show(response, prompt_labels[prompt_index])
+
+                        # Create both brief and verbose versions
+                        response_brief = create_brief_response(response, prompt_labels[prompt_index])
+                        response_verbose = response
+
+                        # Save full response to SD card
+                        if Config.SAVE_FULL_RESPONSES:
+                            save_response_to_sd(filename, response_verbose, prompt_labels[prompt_index])
+
+                        # Show with toggle capability
+                        text_viewer.show(response_brief, response_verbose, prompt_labels[prompt_index])
                         view_mode = True
-                        del response  # Free memory
+
+                        del response, response_brief, response_verbose  # Free memory
                         gc.collect()
                     else:
                         clear_status_overlay(pycam)
