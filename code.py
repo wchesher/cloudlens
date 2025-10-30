@@ -155,15 +155,16 @@ class Config:
 
     @classmethod
     def get_prompts(cls):
-        """Dynamically load ALL prompts from settings.toml"""
+        """Dynamically load ALL prompts from settings.toml including quality ratings"""
         prompts = []
         labels = []
+        qualities = []
 
         prompt_order = cls.PROMPT_ORDER
 
         if not prompt_order:
             print("[ERROR] PROMPT_ORDER not found in settings.toml")
-            return [], []
+            return [], [], []
 
         prompt_names = [name.strip() for name in prompt_order.split(',')]
         print(f"[INFO] Loading {len(prompt_names)} prompts...")
@@ -171,18 +172,21 @@ class Config:
         for prompt_name in prompt_names:
             prompt_var = f"{prompt_name}_PROMPT"
             label_var = f"{prompt_name}_LABEL"
+            quality_var = f"{prompt_name}_QUALITY"
 
             prompt_text = os.getenv(prompt_var)
             label_text = os.getenv(label_var)
+            quality_text = os.getenv(quality_var, "1")  # Default to quality 1
 
             if prompt_text:
                 prompts.append(prompt_text)
                 labels.append(label_text if label_text else prompt_name)
-                print(f"[INFO]   ✓ {prompt_name}")
+                qualities.append(int(quality_text))
+                print(f"[INFO]   ✓ {prompt_name} (Quality {quality_text})")
             else:
                 print(f"[WARN]   ✗ {prompt_var} not found")
 
-        return prompts, labels
+        return prompts, labels, qualities
 
     @classmethod
     def validate(cls):
@@ -197,7 +201,7 @@ class Config:
         elif not cls.ANTHROPIC_API_KEY.startswith("sk-ant-"):
             issues.append("Invalid ANTHROPIC_API_KEY format")
 
-        prompts, labels = cls.get_prompts()
+        prompts, labels, qualities = cls.get_prompts()
         if len(prompts) == 0:
             issues.append("No prompts found in settings.toml")
 
@@ -1123,7 +1127,7 @@ def main():
     text_viewer = TextViewer(pycam)
 
     # Load prompts dynamically from config
-    prompts, prompt_labels = Config.get_prompts()
+    prompts, prompt_labels, prompt_qualities = Config.get_prompts()
     num_prompts = len(prompts)
 
     if num_prompts == 0:
@@ -1152,12 +1156,27 @@ def main():
         scale=2
     )
 
-    # Add quality mode indicator to lower-right corner
+    # Add image quality mode indicator to upper-right corner
     quality_txt = label.Label(
         terminalio.FONT,
         text=f"{mode_info['icon']} {mode_info['label']}",
         color=0x00DDFF,
         x=140,
+        y=18,
+        scale=1
+    )
+
+    # Add prompt quality indicator to lower-right corner (stars)
+    def quality_to_stars(quality):
+        """Convert quality number (1-3) to star representation"""
+        star_map = {1: "*", 2: "**", 3: "***"}
+        return star_map.get(quality, "*")
+
+    prompt_quality_txt = label.Label(
+        terminalio.FONT,
+        text=quality_to_stars(prompt_qualities[prompt_index]),
+        color=0xFFD700,  # Gold color for stars
+        x=210,
         y=220,
         scale=1
     )
@@ -1175,6 +1194,7 @@ def main():
     pycam._botbar.append(rect)
     pycam._botbar.append(prompt_txt)
     pycam.splash.append(quality_txt)
+    pycam.splash.append(prompt_quality_txt)
     pycam.splash.append(branding_txt)
     pycam.display.refresh()
 
@@ -1372,8 +1392,10 @@ def main():
                     # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index + 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
+                    prompt_quality_txt.text = quality_to_stars(prompt_qualities[prompt_index])
                     pycam.display.refresh()
-                    logger.info("Prompt: {}", prompt_labels[prompt_index])
+                    logger.info("Prompt: {} (Quality {})", prompt_labels[prompt_index],
+                               prompt_qualities[prompt_index])
 
             if pycam.left.fell:
                 if browse_mode:
@@ -1384,8 +1406,10 @@ def main():
                     # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index - 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
+                    prompt_quality_txt.text = quality_to_stars(prompt_qualities[prompt_index])
                     pycam.display.refresh()
-                    logger.info("Prompt: {}", prompt_labels[prompt_index])
+                    logger.info("Prompt: {} (Quality {})", prompt_labels[prompt_index],
+                               prompt_qualities[prompt_index])
 
             # SELECT - Browse mode
             if pycam.select.fell:
