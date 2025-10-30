@@ -2,9 +2,19 @@
 # SPDX-License-Identifier: MIT
 """
 CloudLens - AI Camera with Claude Vision API
-CircuitPython 10.x compatible - Version 1.0 Beta
+CircuitPython 10.x compatible - Version 1.0 Production
 
 All configuration is in settings.toml - NO hardcoded values
+
+OPTIMIZATIONS:
+- Specific exception handling (no bare except blocks)
+- Strategic gc.collect() and del for memory management
+- Consolidated duplicate code blocks
+- SD card validation at startup
+- File existence checks before encoding
+- Optimized brightness check (5 points, integer math)
+- Memory cleanup after large operations
+- Bulletproof error handling throughout
 """
 
 import os
@@ -202,10 +212,9 @@ logger = Logger()
 def get_file_size_kb(filepath):
     """Get file size in KB"""
     try:
-        import os
         stat = os.stat(filepath)
         return stat[6] / 1024
-    except:
+    except (OSError, AttributeError):
         return 0
 
 def check_image_size(filepath, mode_info):
@@ -248,35 +257,38 @@ def check_brightness(pycam):
         if width < 8 or height < 8:
             return False
 
+        # Sample 5 key points for speed (center + 4 quadrants)
         sample_points = [
-            (width // 4, height // 4),
-            (width // 2, height // 4),
-            (3 * width // 4, height // 4),
-            (width // 4, height // 2),
-            (width // 2, height // 2),
-            (3 * width // 4, height // 2),
-            (width // 4, 3 * height // 4),
-            (width // 2, 3 * height // 4),
-            (3 * width // 4, 3 * height // 4),
+            (width // 2, height // 2),      # Center
+            (width // 4, height // 4),      # Top-left
+            (3 * width // 4, height // 4),  # Top-right
+            (width // 4, 3 * height // 4),  # Bottom-left
+            (3 * width // 4, 3 * height // 4),  # Bottom-right
         ]
 
         total_brightness = 0
 
         for x, y in sample_points:
             pixel = frame[x, y]
+            # Extract RGB using bit shifts
             r = ((pixel >> 11) & 0x1F) << 3
             g = ((pixel >> 5) & 0x3F) << 2
             b = (pixel & 0x1F) << 3
-            brightness = (0.299 * r + 0.587 * g + 0.114 * b)
+            # Use integer approximation: (30*r + 59*g + 11*b) / 100
+            brightness = (30 * r + 59 * g + 11 * b) // 100
             total_brightness += brightness
 
-        avg_brightness = total_brightness / len(sample_points)
+        avg_brightness = total_brightness // len(sample_points)
         is_dark = avg_brightness < Config.DARK_THRESHOLD
 
+        # Free frame memory
+        del frame
+        gc.collect()
+
         if is_dark:
-            logger.info("Scene is dark (brightness: {:.1f}) - flash recommended", avg_brightness)
+            logger.info("Scene is dark (brightness: {}) - flash recommended", avg_brightness)
         else:
-            logger.info("Scene brightness OK: {:.1f}", avg_brightness)
+            logger.info("Scene brightness OK: {}", avg_brightness)
 
         return is_dark
 
@@ -327,6 +339,13 @@ def connect_wifi(ssid=None, password=None):
 def encode_image(image_path):
     """Encode image to base64"""
     try:
+        # Validate file exists first
+        try:
+            os.stat(image_path)
+        except OSError:
+            logger.error("Image file not found: {}", image_path)
+            return None
+
         with open(image_path, 'rb') as f:
             data = f.read()
 
@@ -334,12 +353,16 @@ def encode_image(image_path):
 
         if file_size > 5242880:
             logger.error("Image too large: {} bytes (max 5MB)", file_size)
+            del data
             return None
 
         base64_data = binascii.b2a_base64(data).decode('utf-8').rstrip()
+        del data  # Free memory immediately
+        gc.collect()
 
         if len(base64_data) > 7000000:
             logger.error("Encoded image too large: {} bytes", len(base64_data))
+            del base64_data
             return None
 
         return base64_data
@@ -456,7 +479,7 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label):
             elif response.status_code == 400:
                 try:
                     error_msg = response.json().get("error", {}).get("message", "Bad request")
-                except:
+                except (ValueError, KeyError, AttributeError):
                     error_msg = "Bad request"
                 logger.error("API error: {}", error_msg)
                 return False, f"Error: {error_msg[:30]}"
@@ -500,18 +523,28 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label):
 
 def save_response(image_path, response_text, prompt_label):
     """Save Claude response as text file"""
-    txt_filename = image_path.replace('.jpg', '.txt')
-    txt_filename = txt_filename[:11] + f"_{prompt_label}" + txt_filename[11:]
+    try:
+        if not image_path or not response_text:
+            logger.warn("Cannot save: missing image_path or response_text")
+            return False
 
-    if "?" in txt_filename:
-        txt_filename = txt_filename.replace("?", "")
+        txt_filename = image_path.replace('.jpg', '.txt')
+        txt_filename = txt_filename[:11] + f"_{prompt_label}" + txt_filename[11:]
 
-    with open(txt_filename, "w") as fp:
-        fp.write(response_text)
-        fp.flush()
+        if "?" in txt_filename:
+            txt_filename = txt_filename.replace("?", "")
 
-    filename_only = txt_filename.split('/')[-1]
-    logger.info("Saved response to: {}", filename_only)
+        with open(txt_filename, "w") as fp:
+            fp.write(response_text)
+            fp.flush()
+
+        filename_only = txt_filename.split('/')[-1]
+        logger.info("Saved response to: {}", filename_only)
+        return True
+
+    except (OSError, ValueError) as e:
+        logger.error("Failed to save response: {}", e)
+        return False
 
 # ============================================================================
 # SCROLLABLE TEXT VIEWER
@@ -572,12 +605,12 @@ class TextViewer:
             if self.text_area:
                 try:
                     self.pycam.splash.remove(self.text_area)
-                except:
+                except (ValueError, AttributeError):
                     pass
             if self.page_indicator:
                 try:
                     self.pycam.splash.remove(self.page_indicator)
-                except:
+                except (ValueError, AttributeError):
                     pass
 
             start_line = self.scroll_pos
@@ -669,17 +702,17 @@ class TextViewer:
         if self.rectangle:
             try:
                 self.pycam.splash.remove(self.rectangle)
-            except:
+            except (ValueError, AttributeError):
                 pass
         if self.text_area:
             try:
                 self.pycam.splash.remove(self.text_area)
-            except:
+            except (ValueError, AttributeError):
                 pass
         if self.page_indicator:
             try:
                 self.pycam.splash.remove(self.page_indicator)
-            except:
+            except (ValueError, AttributeError):
                 pass
 
         self.rectangle = None
@@ -701,7 +734,7 @@ def show_status_overlay(pycam, status_text, color=0xFFFFFF):
             if hasattr(item, '_status_overlay'):
                 try:
                     pycam.splash.remove(item)
-                except:
+                except (ValueError, AttributeError):
                     pass
 
         status_label = label.Label(
@@ -729,10 +762,10 @@ def clear_status_overlay(pycam):
             if hasattr(item, '_status_overlay'):
                 try:
                     pycam.splash.remove(item)
-                except:
+                except (ValueError, AttributeError):
                     pass
         pycam.display.refresh()
-    except:
+    except (AttributeError, RuntimeError):
         pass
 
 def load_image_on_screen(pycam, bitmap, decoder, filepath):
@@ -787,13 +820,36 @@ def get_newest_image():
                     if mtime > newest_time:
                         newest_time = mtime
                         newest = filepath
-                except:
+                except (OSError, IndexError):
                     pass
 
         return newest
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
         logger.error("Failed to get newest image: {}", e)
         return None
+
+def check_sd_card():
+    """Check if SD card is mounted and accessible"""
+    try:
+        os.listdir("/sd")
+        return True
+    except (OSError, RuntimeError):
+        return False
+
+def change_quality_mode(pycam, quality_mode_index, quality_txt):
+    """Change quality mode and update display - consolidated function"""
+    current_mode = Config.QUALITY_MODE_ORDER[quality_mode_index]
+    mode_info = Config.get_quality_mode_info(current_mode)
+
+    pycam.resolution = mode_info["resolution"]
+    quality_txt.text = f"{mode_info['icon']} {mode_info['label']}"
+    pycam.display.refresh()
+
+    logger.info("Quality: {} {} (~{}KB, max ~{}KB)",
+                mode_info['icon'], mode_info['label'],
+                mode_info['target_kb'], mode_info.get('max_expected_kb', 'unknown'))
+
+    return mode_info
 
 # ============================================================================
 # MAIN APPLICATION
@@ -818,6 +874,14 @@ def main():
             return
 
     Config.validate_camera_resolution()
+
+    # Check SD card availability
+    if not check_sd_card():
+        logger.error("SD card not found or not mounted")
+        logger.error("Please insert SD card and restart")
+        return
+
+    logger.info("SD card detected")
 
     # Connect to WiFi
     requests = connect_wifi()
@@ -938,7 +1002,7 @@ def main():
                         # Mark READY message as cleared after first frame
                         if not ready_message_cleared:
                             ready_message_cleared = True
-                except Exception as e:
+                except (RuntimeError, AttributeError, OSError):
                     pass
 
             pycam.keys_debounce()
@@ -984,6 +1048,7 @@ def main():
                     if not the_image:
                         pycam.display_message("No images", color=0xFF0000)
                         time.sleep(Config.MSG_DURATION)
+                        gc.collect()
                         continue
 
                     filename_only = the_image.split('/')[-1]
@@ -995,6 +1060,7 @@ def main():
                     if not is_ok:
                         pycam.display_message(f"TOO LARGE!\n{size_kb}KB > 3MB\nTry lower mode", color=0xFF0000)
                         time.sleep(3)
+                        gc.collect()
                         continue
 
                     showing_captured_image = True
@@ -1015,26 +1081,32 @@ def main():
                         clear_status_overlay(pycam)
                         text_viewer.show(response, prompt_labels[prompt_index])
                         view_mode = True
+                        del response  # Free memory
+                        gc.collect()
                     else:
                         clear_status_overlay(pycam)
                         pycam.display_message(response, color=0xFF0000)
                         time.sleep(2)
+                        gc.collect()
 
                 except TypeError as e:
                     logger.error("Capture failed (TypeError): {}", e)
                     pycam.display_message("Failed", color=0xFF0000)
                     time.sleep(Config.MSG_DURATION)
                     pycam.live_preview_mode()
+                    gc.collect()
 
                 except RuntimeError as e:
                     logger.error("No SD card: {}", e)
                     pycam.display_message("Error\nNo SD Card", color=0xFF0000)
                     time.sleep(Config.MSG_DURATION)
+                    gc.collect()
 
                 except Exception as e:
                     logger.error("Unexpected error: {}", e)
                     pycam.display_message("Error", color=0xFF0000)
                     time.sleep(Config.MSG_DURATION)
+                    gc.collect()
 
             # UP/DOWN - Scroll text OR change quality mode
             if pycam.up.fell:
@@ -1042,32 +1114,14 @@ def main():
                     text_viewer.scroll_up()
                 elif not browse_mode:
                     quality_mode_index = (quality_mode_index + 1) % len(Config.QUALITY_MODE_ORDER)
-                    current_mode = Config.QUALITY_MODE_ORDER[quality_mode_index]
-                    mode_info = Config.get_quality_mode_info(current_mode)
-
-                    pycam.resolution = mode_info["resolution"]
-
-                    quality_txt.text = f"{mode_info['icon']} {mode_info['label']}"
-                    pycam.display.refresh()
-                    logger.info("Quality: {} {} (~{}KB, max ~{}KB)",
-                               mode_info['icon'], mode_info['label'],
-                               mode_info['target_kb'], mode_info.get('max_expected_kb', 'unknown'))
+                    mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt)
 
             if pycam.down.fell:
                 if view_mode:
                     text_viewer.scroll_down()
                 elif not browse_mode:
                     quality_mode_index = (quality_mode_index - 1) % len(Config.QUALITY_MODE_ORDER)
-                    current_mode = Config.QUALITY_MODE_ORDER[quality_mode_index]
-                    mode_info = Config.get_quality_mode_info(current_mode)
-
-                    pycam.resolution = mode_info["resolution"]
-
-                    quality_txt.text = f"{mode_info['icon']} {mode_info['label']}"
-                    pycam.display.refresh()
-                    logger.info("Quality: {} {} (~{}KB, max ~{}KB)",
-                               mode_info['icon'], mode_info['label'],
-                               mode_info['target_kb'], mode_info.get('max_expected_kb', 'unknown'))
+                    mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt)
 
             # LEFT/RIGHT - Navigate
             if pycam.right.fell:
@@ -1118,7 +1172,7 @@ def main():
                     view_mode = False
                     try:
                         pycam.live_preview_mode()
-                    except:
+                    except (RuntimeError, AttributeError):
                         pass
                     pycam.display.refresh()
                     logger.info("Closed text view, restarting viewfinder")
@@ -1142,11 +1196,14 @@ def main():
                         clear_status_overlay(pycam)
                         text_viewer.show(response, prompt_labels[prompt_index])
                         view_mode = True
+                        del response  # Free memory
+                        gc.collect()
                     else:
                         clear_status_overlay(pycam)
                         pycam.display_message(response, color=0xFF0000)
                         time.sleep(2)
                         pycam.display.refresh()
+                        gc.collect()
 
             gc.collect()
 
@@ -1160,7 +1217,7 @@ def main():
                 pycam.display_message("System Error", color=0xFF0000)
                 time.sleep(1)
                 pycam.display.refresh()
-            except:
+            except (RuntimeError, AttributeError):
                 pass
             gc.collect()
 
