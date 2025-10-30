@@ -1102,9 +1102,15 @@ def main():
                 logger.info("Autofocus triggered")
                 pycam.autofocus()
 
-            if pycam.shutter.short_count and not view_mode:
-                logger.info("Capture triggered")
+            # Debug: log shutter button state
+            if pycam.shutter.short_count:
+                if view_mode:
+                    logger.warn("Shutter blocked - still in view_mode! Call OK to close text viewer first.")
+                else:
+                    logger.info("Capture triggered - view_mode={}, browse_mode={}, showing_captured_image={}",
+                               view_mode, browse_mode, showing_captured_image)
 
+            if pycam.shutter.short_count and not view_mode:
                 try:
                     current_mode = Config.QUALITY_MODE_ORDER[quality_mode_index]
                     mode_info = Config.get_quality_mode_info(current_mode)
@@ -1259,15 +1265,22 @@ def main():
             # OK - Confirm/Close
             if pycam.ok.fell:
                 if view_mode:
+                    logger.info("OK pressed - closing text viewer and returning to viewfinder")
                     text_viewer.clear()
                     showing_captured_image = False
                     view_mode = False
+                    browse_mode = False  # Ensure browse mode is off
+
+                    # Force viewfinder restart
                     try:
                         pycam.live_preview_mode()
-                    except (RuntimeError, AttributeError):
-                        pass
+                        logger.info("Viewfinder restarted successfully")
+                    except (RuntimeError, AttributeError) as e:
+                        logger.error("Failed to restart viewfinder: {}", e)
+
+                    # Force display refresh
                     pycam.display.refresh()
-                    logger.info("Closed text view, restarting viewfinder")
+                    logger.info("Back to viewfinder mode - shutter enabled")
 
                 elif browse_mode:
                     filename = all_images[file_index]
