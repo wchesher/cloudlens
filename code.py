@@ -1213,13 +1213,14 @@ def main():
                     quality_mode_index = (quality_mode_index - 1) % len(Config.QUALITY_MODE_ORDER)
                     mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt)
 
-            # LEFT/RIGHT - Navigate
+            # LEFT/RIGHT - Navigate prompts or browse images
             if pycam.right.fell:
                 if browse_mode:
                     file_index = (file_index + 1) % len(all_images)
                     filename = all_images[file_index]
                     load_image_on_screen(pycam, browse_bitmap, decoder, filename)
-                elif not view_mode:
+                else:
+                    # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index + 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
                     pycam.display.refresh()
@@ -1230,7 +1231,8 @@ def main():
                     file_index = (file_index - 1) % len(all_images)
                     filename = all_images[file_index]
                     load_image_on_screen(pycam, browse_bitmap, decoder, filename)
-                elif not view_mode:
+                else:
+                    # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index - 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
                     pycam.display.refresh()
