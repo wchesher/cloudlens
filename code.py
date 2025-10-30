@@ -1274,6 +1274,13 @@ def main():
         scale=2
     )
 
+    # Explicitly start preview mode to ensure display groups are active
+    try:
+        pycam.live_preview_mode()
+        logger.info("Preview mode started")
+    except (RuntimeError, AttributeError) as e:
+        logger.warn("Could not start preview mode: {}", e)
+
     pycam._botbar.append(rect)
     pycam._botbar.append(prompt_txt)
     pycam._botbar.hidden = False  # Ensure bottom bar is visible
@@ -1281,6 +1288,9 @@ def main():
     pycam.splash.append(prompt_quality_txt)
     pycam.splash.append(branding_txt)
     pycam.display.refresh()
+
+    logger.info("UI elements added - prompt mode: {}, stars: {}",
+                prompt_labels[prompt_index], quality_to_stars(prompt_qualities[prompt_index]))
 
     # Application state
     system_ready = False
