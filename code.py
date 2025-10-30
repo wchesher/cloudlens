@@ -1276,6 +1276,7 @@ def main():
 
     pycam._botbar.append(rect)
     pycam._botbar.append(prompt_txt)
+    pycam._botbar.hidden = False  # Ensure bottom bar is visible
     pycam.splash.append(quality_txt)
     pycam.splash.append(prompt_quality_txt)
     pycam.splash.append(branding_txt)
