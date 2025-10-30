@@ -7,7 +7,7 @@
 # Modified for Claude Vision API and extensive feature additions
 """
 CloudLens - AI Camera with Claude Vision API
-CircuitPython 10.x compatible - Version 1.0 Production
+Version 1.0.0 - CircuitPython 10.x compatible
 
 Derived from Adafruit's OpenAI Image Descriptors project by Liz Clark
 Modified to use Claude Vision API with extensive optimizations and features
@@ -384,14 +384,19 @@ def encode_image(image_path):
         logger.error("Encode failed: {}", e)
         return None
 
-def send_to_claude(requests_session, image_path, prompt, prompt_label):
-    """Send image to Claude API"""
+def send_to_claude(requests_session, image_path, prompt, prompt_label, pycam=None):
+    """Send image to Claude API with cancellation support
+
+    Args:
+        pycam: PyCamera object for cancel button monitoring (optional)
+    """
     if not requests_session:
         return False, "Error: No network"
 
     if not Config.ANTHROPIC_API_KEY:
         return False, "Error: No API key"
 
+    logger.info("Encoding image for Claude API...")
     base64_image = encode_image(image_path)
     if not base64_image:
         return False, "Error: Image too large or encoding failed"
@@ -426,7 +431,22 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label):
 
     for attempt in range(1, Config.API_RETRY_ATTEMPTS + 1):
         response = None
+
+        # Check for cancel button before attempting
+        if pycam:
+            try:
+                pycam.keys_debounce()
+                if pycam.select.fell:
+                    logger.info("API call cancelled by user")
+                    del base64_image
+                    gc.collect()
+                    return False, "Cancelled by user"
+            except (AttributeError, RuntimeError):
+                pass
+
         try:
+            logger.info("Sending to Claude API (attempt {}/{})...", attempt, Config.API_RETRY_ATTEMPTS)
+
             response = requests_session.post(
                 Config.CLAUDE_ENDPOINT,
                 headers=headers,
@@ -509,30 +529,63 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label):
             error_str = str(e)
             if "timed out" in error_str.lower() or "timeout" in error_str.lower():
                 logger.error("API timeout on attempt {}/{}", attempt, Config.API_RETRY_ATTEMPTS)
+
+                # Check for cancel during retry wait
                 if attempt < Config.API_RETRY_ATTEMPTS:
-                    logger.info("Retrying... (attempt {} of {})", attempt + 1, Config.API_RETRY_ATTEMPTS)
-                    time.sleep(Config.API_RETRY_DELAY)
+                    logger.info("Will retry in {} seconds (press SELECT to cancel)...", Config.API_RETRY_DELAY)
+
+                    # Wait with cancel check
+                    for _ in range(Config.API_RETRY_DELAY * 2):  # Check every 0.5s
+                        time.sleep(0.5)
+                        if pycam:
+                            try:
+                                pycam.keys_debounce()
+                                if pycam.select.fell:
+                                    logger.info("Retry cancelled by user")
+                                    del base64_image
+                                    gc.collect()
+                                    return False, "Cancelled by user"
+                            except (AttributeError, RuntimeError):
+                                pass
+
                     continue
-                return False, "Error: API timeout"
+                else:
+                    del base64_image
+                    gc.collect()
+                    return False, "Error: API timeout after retries"
             else:
                 logger.error("Network error: {}", error_str[:50])
                 if attempt < Config.API_RETRY_ATTEMPTS:
+                    logger.info("Retrying network request...")
                     time.sleep(Config.API_RETRY_DELAY)
                     continue
-                return False, f"Error: Network {error_str[:20]}"
+                else:
+                    del base64_image
+                    gc.collect()
+                    return False, f"Error: Network failure"
 
         except Exception as e:
             logger.error("Request failed: {}", str(e)[:50])
             if attempt < Config.API_RETRY_ATTEMPTS:
+                logger.info("Retrying after error...")
                 time.sleep(Config.API_RETRY_DELAY)
                 continue
-            return False, f"Error: {str(e)[:30]}"
+            else:
+                del base64_image
+                gc.collect()
+                return False, f"Error: Request failed"
 
         finally:
             if response:
-                response.close()
+                try:
+                    response.close()
+                except (AttributeError, RuntimeError):
+                    pass
             gc.collect()
 
+    # All retries exhausted
+    del base64_image
+    gc.collect()
     return False, "Error: All retries failed"
 
 def save_response(image_path, response_text, prompt_label):
@@ -589,12 +642,14 @@ class TextViewer:
             self.current_prompt_label = prompt_label
             self.is_active = True
 
-            wrapped_text = "\n".join(wrap_text_to_lines(text, Config.TEXT_WRAP_WIDTH))
-
+            # For haiku, preserve original line structure without wrapping
             if "haiku" in prompt_label.lower():
-                wrapped_text = wrapped_text.replace("*", "\n")
-
-            self.lines = wrapped_text.split('\n')
+                formatted_text = text.replace("*", "\n")
+                self.lines = formatted_text.split('\n')
+            else:
+                # Normal text: wrap to screen width
+                wrapped_text = "\n".join(wrap_text_to_lines(text, Config.TEXT_WRAP_WIDTH))
+                self.lines = wrapped_text.split('\n')
 
             self.rectangle = vectorio.Rectangle(
                 pixel_shader=self.palette,
@@ -1049,9 +1104,15 @@ def main():
                 logger.info("Autofocus triggered")
                 pycam.autofocus()
 
-            if pycam.shutter.short_count and not view_mode:
-                logger.info("Capture triggered")
+            # Debug: log shutter button state
+            if pycam.shutter.short_count:
+                if view_mode:
+                    logger.warn("Shutter blocked - still in view_mode! Call OK to close text viewer first.")
+                else:
+                    logger.info("Capture triggered - view_mode={}, browse_mode={}, showing_captured_image={}",
+                               view_mode, browse_mode, showing_captured_image)
 
+            if pycam.shutter.short_count and not view_mode:
                 try:
                     current_mode = Config.QUALITY_MODE_ORDER[quality_mode_index]
                     mode_info = Config.get_quality_mode_info(current_mode)
@@ -1100,13 +1161,14 @@ def main():
                     showing_captured_image = True
 
                     # Immediate send - no delay
-                    show_status_overlay(pycam, "Sending to Claude...", 0x00DDDD)
+                    show_status_overlay(pycam, "Sending to Claude... (SELECT to cancel)", 0x00DDDD)
 
                     success, response = send_to_claude(
                         requests,
                         the_image,
                         prompts[prompt_index],
-                        prompt_labels[prompt_index]
+                        prompt_labels[prompt_index],
+                        pycam
                     )
 
                     showing_captured_image = False
@@ -1119,7 +1181,9 @@ def main():
                         gc.collect()
                     else:
                         clear_status_overlay(pycam)
-                        pycam.display_message(response, color=0xFF0000)
+                        # Show cancelled in yellow, errors in red
+                        error_color = 0xFFFF00 if "Cancelled" in response else 0xFF0000
+                        pycam.display_message(response, color=error_color)
                         time.sleep(2)
                         gc.collect()
 
@@ -1157,13 +1221,14 @@ def main():
                     quality_mode_index = (quality_mode_index - 1) % len(Config.QUALITY_MODE_ORDER)
                     mode_info = change_quality_mode(pycam, quality_mode_index, quality_txt)
 
-            # LEFT/RIGHT - Navigate
+            # LEFT/RIGHT - Navigate prompts or browse images
             if pycam.right.fell:
                 if browse_mode:
                     file_index = (file_index + 1) % len(all_images)
                     filename = all_images[file_index]
                     load_image_on_screen(pycam, browse_bitmap, decoder, filename)
-                elif not view_mode:
+                else:
+                    # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index + 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
                     pycam.display.refresh()
@@ -1174,7 +1239,8 @@ def main():
                     file_index = (file_index - 1) % len(all_images)
                     filename = all_images[file_index]
                     load_image_on_screen(pycam, browse_bitmap, decoder, filename)
-                elif not view_mode:
+                else:
+                    # Allow prompt switching even when viewing text
                     prompt_index = (prompt_index - 1) % num_prompts
                     prompt_txt.text = prompt_labels[prompt_index]
                     pycam.display.refresh()
@@ -1201,28 +1267,36 @@ def main():
             # OK - Confirm/Close
             if pycam.ok.fell:
                 if view_mode:
+                    logger.info("OK pressed - closing text viewer and returning to viewfinder")
                     text_viewer.clear()
                     showing_captured_image = False
                     view_mode = False
+                    browse_mode = False  # Ensure browse mode is off
+
+                    # Force viewfinder restart
                     try:
                         pycam.live_preview_mode()
-                    except (RuntimeError, AttributeError):
-                        pass
+                        logger.info("Viewfinder restarted successfully")
+                    except (RuntimeError, AttributeError) as e:
+                        logger.error("Failed to restart viewfinder: {}", e)
+
+                    # Force display refresh
                     pycam.display.refresh()
-                    logger.info("Closed text view, restarting viewfinder")
+                    logger.info("Back to viewfinder mode - shutter enabled")
 
                 elif browse_mode:
                     filename = all_images[file_index]
                     filename_only = filename.split('/')[-1]
                     logger.info("Sending browsed image: {}", filename_only)
 
-                    show_status_overlay(pycam, "Sending to Claude...", 0x00DDDD)
+                    show_status_overlay(pycam, "Sending to Claude... (SELECT to cancel)", 0x00DDDD)
 
                     success, response = send_to_claude(
                         requests,
                         filename,
                         prompts[prompt_index],
-                        prompt_labels[prompt_index]
+                        prompt_labels[prompt_index],
+                        pycam
                     )
 
                     if success:
@@ -1234,7 +1308,9 @@ def main():
                         gc.collect()
                     else:
                         clear_status_overlay(pycam)
-                        pycam.display_message(response, color=0xFF0000)
+                        # Show cancelled in yellow, errors in red
+                        error_color = 0xFFFF00 if "Cancelled" in response else 0xFF0000
+                        pycam.display_message(response, color=error_color)
                         time.sleep(2)
                         pycam.display.refresh()
                         gc.collect()
