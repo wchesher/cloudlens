@@ -172,7 +172,7 @@ CloudLens demonstrates:
 
 **Derivative Work:**
 - CloudLens modifications and enhancements
-- Copyright (c) 2025 CloudLens Contributors
+- Copyright (c) 2025 William Chesher
 - Modifications include: Claude API integration, 12 prompt modes, quality mode system, browse mode, optimizations, bulletproof error handling, configuration management
 
 ## License
@@ -182,7 +182,7 @@ MIT License — see LICENSE file for details.
 This project is a derivative work based on Adafruit's "OpenAI Image Descriptors with Memento" by Liz Clark, used under the MIT License. Both the original work and modifications are licensed under MIT.
 
 **Original Copyright:** Copyright (c) 2024 Liz Clark for Adafruit Industries
-**Derivative Copyright:** Copyright (c) 2025 CloudLens Contributors
+**Derivative Copyright:** Copyright (c) 2025 William Chesher
 
 ## Version
 

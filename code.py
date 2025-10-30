@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2024 Liz Clark for Adafruit Industries
-# SPDX-FileCopyrightText: 2025 CloudLens Contributors
+# SPDX-FileCopyrightText: 2025 William Chesher
 # SPDX-License-Identifier: MIT
 #
 # Based on "OpenAI Image Descriptors with Memento" by Liz Clark
