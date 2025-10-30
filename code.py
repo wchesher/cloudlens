@@ -1,8 +1,16 @@
-# SPDX-FileCopyrightText: 2025 CloudLens - AI Vision Camera
+# SPDX-FileCopyrightText: 2024 Liz Clark for Adafruit Industries
+# SPDX-FileCopyrightText: 2025 CloudLens Contributors
 # SPDX-License-Identifier: MIT
+#
+# Based on "OpenAI Image Descriptors with Memento" by Liz Clark
+# Original: https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all
+# Modified for Claude Vision API and extensive feature additions
 """
 CloudLens - AI Camera with Claude Vision API
 CircuitPython 10.x compatible - Version 1.0 Production
+
+Derived from Adafruit's OpenAI Image Descriptors project by Liz Clark
+Modified to use Claude Vision API with extensive optimizations and features
 
 All configuration is in settings.toml - NO hardcoded values
 

@@ -1,6 +1,14 @@
 MIT License
 
-Copyright (c) 2025 William Chesher
+Original Work:
+Copyright (c) 2024 Liz Clark for Adafruit Industries
+
+Derivative Work:
+Copyright (c) 2025 CloudLens Contributors
+
+This project is a derivative work based on "OpenAI Image Descriptors with Memento"
+by Liz Clark for Adafruit Industries, available at:
+https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

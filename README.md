@@ -2,6 +2,8 @@
 
 CloudLens is a CircuitPython 10.x camera application that integrates hardware cameras with Anthropic's Claude API for real-time AI vision analysis. Take a photo and get instant AI-powered responses with 12 creative prompt modes.
 
+**Based on** [OpenAI Image Descriptors with Memento](https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all) by Liz Clark for Adafruit Industries. Modified to use Claude Vision API with extensive feature additions and optimizations.
+
 ## Key Features
 
 - **Real-Time AI Vision**: Capture photos and analyze them with Claude's vision capabilities
@@ -161,12 +163,27 @@ CloudLens demonstrates:
 - Ensure SD card is properly inserted
 - Format as FAT32 if necessary
 
+## Credits & Attribution
+
+**Original Work:**
+- "OpenAI Image Descriptors with Memento" by Liz Clark
+- Copyright (c) 2024 Liz Clark for Adafruit Industries
+- Source: https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all
+
+**Derivative Work:**
+- CloudLens modifications and enhancements
+- Copyright (c) 2025 CloudLens Contributors
+- Modifications include: Claude API integration, 12 prompt modes, quality mode system, browse mode, optimizations, bulletproof error handling, configuration management
+
 ## License
 
 MIT License — see LICENSE file for details.
 
-Copyright (c) 2025 William Chesher
+This project is a derivative work based on Adafruit's "OpenAI Image Descriptors with Memento" by Liz Clark, used under the MIT License. Both the original work and modifications are licensed under MIT.
+
+**Original Copyright:** Copyright (c) 2024 Liz Clark for Adafruit Industries
+**Derivative Copyright:** Copyright (c) 2025 CloudLens Contributors
 
 ## Version
 
-CloudLens 1.0 Beta - CircuitPython 10.x
+CloudLens 1.0 Production - CircuitPython 10.x
