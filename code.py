@@ -1218,20 +1218,13 @@ def main():
     prompt_index = 0
     quality_mode_index = Config.QUALITY_MODE_ORDER.index(quality_mode)
 
-    # Add prompt label to bottom bar
-    rect = vectorio.Rectangle(
-        pixel_shader=palette,
-        width=240,
-        height=20,
-        x=0,
-        y=0
-    )
+    # Add prompt mode indicator to lower-left corner (same as other UI elements)
     prompt_txt = label.Label(
         terminalio.FONT,
         text=prompt_labels[prompt_index],
         color=0x00DDFF,
-        x=10,
-        y=15,
+        x=5,
+        y=220,
         scale=2
     )
 
@@ -1277,25 +1270,19 @@ def main():
     except (RuntimeError, AttributeError) as e:
         logger.warn("Could not start preview mode: {}", e)
 
-    # Add UI elements to display groups
-    logger.info("Adding rect and prompt_txt to _botbar")
-    pycam._botbar.append(rect)
-    pycam._botbar.append(prompt_txt)
-    pycam._botbar.hidden = False  # Ensure bottom bar is visible
-
-    logger.info("Adding quality indicators and branding to splash")
-    pycam.splash.append(quality_txt)
-    pycam.splash.append(prompt_quality_txt)
-    pycam.splash.append(branding_txt)
+    # Add all UI elements directly to splash (not _botbar)
+    logger.info("Adding UI elements to splash")
+    pycam.splash.append(branding_txt)       # Upper-left
+    pycam.splash.append(quality_txt)        # Upper-right
+    pycam.splash.append(prompt_txt)         # Lower-left
+    pycam.splash.append(prompt_quality_txt) # Lower-right
 
     logger.info("Refreshing display")
     pycam.display.refresh()
 
-    logger.info("UI setup complete - mode: {}, stars: {}, _botbar.hidden: {}, _botbar length: {}",
+    logger.info("UI setup complete - mode: {}, stars: {}",
                 prompt_labels[prompt_index],
-                quality_to_stars(prompt_qualities[prompt_index]),
-                pycam._botbar.hidden,
-                len(pycam._botbar))
+                quality_to_stars(prompt_qualities[prompt_index]))
 
     # Application state
     system_ready = False
