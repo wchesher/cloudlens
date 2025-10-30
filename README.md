@@ -1,6 +1,6 @@
 # CloudLens: AI Vision Camera for CircuitPython
 
-**Professional AI-powered camera system for microcontrollers.** CloudLens integrates hardware cameras with Anthropic's Claude Vision API for real-time image analysis. Capture photos and receive instant AI-powered insights through 12 specialized prompt modes.
+**Professional AI-powered camera system for microcontrollers.** CloudLens integrates hardware cameras with Anthropic's Claude Vision API for real-time image analysis. Capture photos and receive instant AI-powered insights through 12 specialized prompt modes with educational prompt engineering framework.
 
 **Based on** [OpenAI Image Descriptors with Memento](https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all) by Liz Clark for Adafruit Industries. Extensively modified for Claude Vision API with production-grade optimizations and features.
 
@@ -15,54 +15,66 @@
 3. Copy `code.py` and `settings.toml` to CIRCUITPY drive
 4. Edit `settings.toml`: Add WiFi credentials and Anthropic API key (`sk-ant-...`)
 5. Insert FAT32-formatted SD card
-6. Reset device
+6. Reset device and wait for "ready" message
 
-**Controls:** SHUTTER (capture), LEFT/RIGHT (prompts), UP/DOWN (quality), SELECT (browse), OK (close)
+**Controls:** SHUTTER (capture), LEFT/RIGHT (prompts), UP (toggle BRIEF/VERBOSE), DOWN (quality/scroll), SELECT (browse), OK (close/wake)
 
 ---
 
 ## Key Features
 
+### Core Capabilities
 - **Real-Time AI Vision**: Capture and analyze with Claude Sonnet 4.5
-- **12 Creative Prompts**: Descriptions, art analysis, haiku, translation, identification, storytelling
+- **12 Educational Prompts**: Designed using professional prompt engineering framework
+- **BRIEF/VERBOSE Toggle**: Smart response truncation with full-text on demand
+- **Quality Rating System**: Prompts rated 1-3 stars for complexity and insight potential
 - **4 Quality Modes**: LOW/MEDIUM/HIGH/ULTRA with automatic size management
+- **Response Archiving**: Full responses automatically saved to SD card as `.txt` files
+
+### Professional Features
 - **Smart Auto-Flash**: 5-point brightness detection for low-light scenes
-- **Browse Mode**: Review and re-analyze saved images
+- **Browse Mode**: Review and re-analyze saved images with SELECT cancellation
+- **Screensaver Mode**: Display turns off after 120 seconds of inactivity
+- **Clean Boot Screen**: Branded loading animation with progress indicators
 - **Scrollable Display**: Multi-page text viewer for long responses
-- **Professional UI**: Branded viewfinder with quality indicators
+- **Professional UI**: Branded viewfinder with dual quality indicators
+
+### Technical Excellence
 - **Zero Hardcoded Values**: 100% configuration via `settings.toml`
 - **Production-Ready**: Bulletproof error handling, memory optimization, retry logic
+- **Prompt Engineering Education**: 5-component framework teaches AI instruction design
+- **Memory Optimized**: Strategic `gc.collect()` and immediate cleanup
 
 ---
 
-## Technical Specifications
+## What's New in Version 1.0.0
 
-### Performance
-- **Image Capture**: <1s from shutter to API call
-- **API Response**: 2-10s depending on complexity
-- **Memory Optimization**: Strategic `gc.collect()` and immediate cleanup
-- **Brightness Detection**: 5-point sampling with integer math
+### BRIEF/VERBOSE System
+- **UP button toggles** between truncated (BRIEF) and full (VERBOSE) text
+- Smart truncation respects prompt types (haiku never truncated)
+- Full responses always saved to SD card as `.txt` files
+- Visual indicator shows current mode: `[B]` or `[V]`
 
-### Image Handling
-- **Max Image Size**: 3072 KB (3 MB) - configurable
-- **Max API Payload**: 5 MB raw, 7 MB base64-encoded
-- **Supported Resolutions**: 240×240 to 2560×1920 (13 levels)
-- **Format**: JPEG with dynamic quality adjustment
-- **Storage**: SD card (FAT32), unlimited capacity
+### Prompt Engineering Framework
+All 12 prompts redesigned using 5-component structure:
+1. **ROLE** - Who is the AI? (expertise, perspective)
+2. **ATTITUDE** - How do they communicate? (tone, personality)
+3. **TASK** - What's the core objective? (clear action)
+4. **CONSTRAINTS** - What are the boundaries? (rules, limits)
+5. **OUTPUT FORMAT** - How is it structured? (exact format)
 
-### Network & API
-- **WiFi**: 2.4GHz only (ESP32-S3 limitation)
-- **API Model**: Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
-- **Max Tokens**: 1024 (configurable)
-- **Timeout**: 120 seconds (configurable)
-- **Retry Logic**: 3 attempts with exponential backoff
-- **Rate Limiting**: Automatic retry with delay
+### Quality Rating System
+- Prompts rated 1-3 stars based on complexity and insight potential
+- **⭐ (Quality 1)**: Straightforward tasks (DESCRIBE, TRANSLATE, PLANT_ID, WEIRD)
+- **⭐⭐ (Quality 2)**: Creative interpretation (HAIKU, MOVIE, ALIEN, CAR)
+- **⭐⭐⭐ (Quality 3)**: Deep analysis (ART_ANALYSIS, STUDY, KINDNESS, DRAMA)
+- Stars displayed in lower-right corner (gold, scale=2)
 
-### Memory & Stability
-- **CircuitPython Version**: 10.x required
-- **Garbage Collection**: 18 strategic collection points
-- **Error Handling**: 100% specific exceptions (zero bare `except` blocks)
-- **Memory Cleanup**: Immediate `del` after large operations
+### UI Enhancements
+- **Clean boot screen**: Loading animation with animated dots
+- **Screensaver mode**: Display turns off after 120s inactivity (any button wakes)
+- **Improved feedback**: "snap" instead of "SNAP!" for refined aesthetic
+- **Dual quality display**: Image quality (upper-right), prompt quality (lower-right)
 
 ---
 
@@ -125,7 +137,7 @@ ANTHROPIC_API_KEY = "sk-ant-your-api-key-here"
 Format SD card as FAT32, insert into Memento Camera Board
 
 ### 6. Reset Device
-Press reset button or reconnect USB. Look for "CloudLens" on display.
+Press reset button or reconnect USB. Wait for "ready" message on display.
 
 ---
 
@@ -141,31 +153,43 @@ CIRCUITPY_WIFI_SSID = "YourNetwork"
 CIRCUITPY_WIFI_PASSWORD = "password123"
 ANTHROPIC_API_KEY = "sk-ant-api03-..."
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
-CLAUDE_MAX_TOKENS = 1024
+CLAUDE_MAX_TOKENS = "1024"
 ```
 
 **Camera & Quality:**
 ```toml
-CAMERA_RESOLUTION = 3              # 0-12 (3 = 800×600)
-DEFAULT_QUALITY_MODE = "MEDIUM"    # LOW, MEDIUM, HIGH, ULTRA
-AUTO_FLASH_ENABLED = true
-DARK_THRESHOLD = 30                # 0-255, lower = more sensitive
+CAMERA_RESOLUTION = "3"              # 0-12 (3 = 800×600)
+DEFAULT_QUALITY_MODE = "MEDIUM"      # LOW, MEDIUM, HIGH, ULTRA
+AUTO_FLASH_ENABLED = "true"
+DARK_THRESHOLD = "30"                # 0-255, lower = more sensitive
+```
+
+**Response Display:**
+```toml
+DEFAULT_VERBOSITY = "BRIEF"          # Start with BRIEF or VERBOSE
+SAVE_FULL_RESPONSES = "true"         # Save .txt files to SD
+BRIEF_MODE_LIMIT = "200"             # Character limit for BRIEF
+```
+
+**Screensaver:**
+```toml
+SCREENSAVER_TIMEOUT = "120"          # Seconds (0 to disable)
 ```
 
 **Display:**
 ```toml
-TEXT_SCALE = 2                     # Font size multiplier
-TEXT_WRAP_WIDTH = 20               # Characters per line
-LINES_PER_PAGE = 7                 # Lines visible per screen
+TEXT_SCALE = "2"                     # Font size multiplier
+TEXT_WRAP_WIDTH = "20"               # Characters per line
+LINES_PER_PAGE = "7"                 # Lines visible per screen
 ```
 
 **Network Tuning:**
 ```toml
-WIFI_TIMEOUT = 30                  # Seconds
-WIFI_RETRY_ATTEMPTS = 3
-API_TIMEOUT = 120                  # Seconds
-API_RETRY_ATTEMPTS = 3
-API_RETRY_DELAY = 2                # Seconds between retries
+WIFI_TIMEOUT = "30"                  # Seconds
+WIFI_RETRY_ATTEMPTS = "3"
+API_TIMEOUT = "120"                  # Seconds
+API_RETRY_ATTEMPTS = "3"
+API_RETRY_DELAY = "2"                # Seconds between retries
 ```
 
 ### Resolution Codes
@@ -187,64 +211,121 @@ API_RETRY_DELAY = 2                # Seconds between retries
 | **SHUTTER** (short) | Capture | Take photo and analyze with current prompt |
 | **SHUTTER** (long) | Autofocus | Focus camera before capture |
 | **LEFT/RIGHT** | Navigate | Cycle through prompt modes |
-| **UP/DOWN** | Quality/Scroll | Change quality mode or scroll text |
-| **SELECT** | Browse | Enter/exit saved image browser |
-| **OK** | Confirm/Close | Send browsed image or close text viewer |
+| **UP** | Toggle/Quality | Toggle BRIEF/VERBOSE when viewing text, change quality in viewfinder |
+| **DOWN** | Scroll/Quality | Scroll down when viewing text, change quality in viewfinder |
+| **SELECT** | Browse/Cancel | Enter/exit saved image browser, cancel API calls |
+| **OK** | Confirm/Wake | Send browsed image, close text viewer, wake from screensaver |
 
 ### Viewfinder Display
 
 ```
 ┌─────────────────────────────────────┐
-│ CloudLens                           │ ← Branding
+│ CloudLens              ** MED 800p  │ ← Branding + Image Quality
 │                                     │
 │         [LIVE VIEWFINDER]           │
 │                                     │
 │                                     │
-│  DESCRIBE                ** MEDIUM  │ ← Prompt & Quality
+│  DESCRIBE                       *** │ ← Prompt Mode + Quality Stars
 └─────────────────────────────────────┘
 ```
 
 **Display Elements:**
 - **Top-left**: CloudLens branding (green)
-- **Bottom-left**: Current prompt mode (cyan, large)
-- **Bottom-right**: Quality mode with icon (cyan)
+- **Top-right**: Image quality mode with icon (cyan) - e.g., "** MED 800p"
+- **Bottom-left**: Current prompt mode (cyan, large) - e.g., "DESCRIBE"
+- **Bottom-right**: Prompt quality stars (gold, large) - ⭐, ⭐⭐, or ⭐⭐⭐
 
 ### Quality Modes
 
 | Mode | Resolution | Target Size | Max Expected | Use Case |
 |------|------------|-------------|--------------|----------|
-| **LOW** | 640×480 | 300 KB | 400 KB | Quick captures, data conservation |
+| **LOW** | 640×480 | 300 KB | 450 KB | Quick captures, data conservation |
 | **MEDIUM** | 800×600 | 600 KB | 800 KB | Balanced quality/speed (default) |
-| **HIGH** | 1024×768 | 1000 KB | 1300 KB | Detailed analysis |
-| **ULTRA** | 1280×720 | 1400 KB | 1800 KB | Maximum detail, fine print |
+| **HIGH** | 1024×768 | 1000 KB | 1400 KB | Detailed analysis |
+| **ULTRA** | 1280×720 | 1400 KB | 2000 KB | Maximum detail, fine print |
 
 **Note:** Images exceeding 3 MB will be rejected with error message.
 
 ### Prompt Modes
 
-1. **DESCRIBE** - Accessibility-focused alt text descriptions
-2. **ART_ANALYSIS** - Formal art critique (composition, color, technique)
-3. **HAIKU** - Three-line poetry inspired by the image
-4. **TRANSLATE** - OCR text extraction and translation to English
-5. **ALIEN** - Whimsical alien perspective on Earth objects
-6. **WEIRD** - Anomaly detection and unusual element identification
-7. **MOVIE** - Dramatic movie title and tagline generation
-8. **PLANT** - Plant species identification and care info
-9. **CAR** - Automotive design analysis
-10. **DRAMA** - Soap opera-style storytelling
-11. **STUDY** - Educational tutoring for study materials
-12. **KINDNESS** - Moments of human connection and compassion
+All prompts use the 5-component framework (ROLE, ATTITUDE, TASK, CONSTRAINTS, OUTPUT FORMAT):
+
+**Quality 1 (⭐) - Straightforward Tasks:**
+1. **DESCRIBE** - Accessibility specialist writing alt text for screen readers
+2. **TRANSLATE** - Translator converting non-English text to English
+3. **PLANT_ID** - Botanist identifying plant species with scientific nomenclature
+4. **WEIRD** - Observer detecting unusual, unexpected, or odd elements
+
+**Quality 2 (⭐⭐) - Creative Interpretation:**
+5. **HAIKU** - Contemplative poet composing 5-7-5 haiku about the image
+6. **MOVIE** - Hollywood pitch writer creating sensational movie titles
+7. **ALIEN** - Confused alien visitor experiencing Earth for the first time
+8. **CAR** - Automotive designer imagining objects as fictional car concepts
+
+**Quality 3 (⭐⭐⭐) - Deep Analysis:**
+9. **ART_ANALYSIS** - Art educator analyzing 7 formal elements (LINE, SHAPE, COLOR, TEXTURE, SPACE, BALANCE, EMPHASIS)
+10. **STUDY** - Patient tutor creating practice questions, mnemonics, and real-world applications
+11. **KINDNESS** - Documentarian exploring moments of human connection and compassion
+12. **DRAMA** - Melodramatic soap opera writer creating peak cliffhanger scenes
 
 ### Workflow
 
-1. **Power On** → Wait for "READY!" message (green)
-2. **Select Prompt** → LEFT/RIGHT to choose mode
-3. **Adjust Quality** → UP/DOWN for resolution
-4. **Compose Shot** → Frame your subject
-5. **Capture** → Press SHUTTER
-6. **Wait** → "SNAP!" → "Sending to Claude..."
-7. **Read Response** → UP/DOWN to scroll, OK to close
-8. **Browse** → SELECT to review saved images
+1. **Power On** → Watch clean boot animation with "Loading....." dots
+2. **Wait** → "ready" message appears, viewfinder starts
+3. **Select Prompt** → LEFT/RIGHT to choose mode (see quality stars change)
+4. **Adjust Quality** → UP/DOWN for resolution
+5. **Compose Shot** → Frame your subject
+6. **Capture** → Press SHUTTER
+7. **Wait** → "snap" → "Sending to Claude..." (SELECT to cancel)
+8. **Read Response** → Starts in BRIEF mode
+9. **Toggle Detail** → Press UP to expand to VERBOSE, UP again to collapse
+10. **Scroll** → DOWN to scroll through text
+11. **Close** → OK to return to viewfinder
+12. **Browse** → SELECT to review saved images
+
+### BRIEF/VERBOSE Toggle
+
+**BRIEF Mode (Default):**
+- Shows 1-2 sentences or first key point (~200 characters)
+- Quick scan for essential information
+- Prompts like HAIKU, PLANT_ID always show full text
+- Displays `[B] UP=toggle OK=close` at bottom
+
+**VERBOSE Mode:**
+- Shows complete response
+- Full detail for deep analysis
+- Press UP again to return to BRIEF
+- Displays `[V] UP=toggle OK=close` at bottom
+
+**Example with ART_ANALYSIS (⭐⭐⭐):**
+```
+BRIEF: "This artwork uses curved lines and warm colors creating visual movement..."
+       [↑ UP for full response]
+
+       ↓ Press UP
+
+VERBOSE: "LINE: The composition features flowing curved lines creating dynamic
+          movement throughout...
+          SHAPE: Organic shapes dominate with soft edges...
+          COLOR: Warm palette with reds, oranges, and yellows...
+          [full 7-element analysis]"
+```
+
+### Screensaver Mode
+
+**Activation:**
+- After 120 seconds of no button presses (configurable)
+- Screen completely blacks out (backlight OFF)
+- Saves battery and extends LCD lifespan
+
+**Wake-Up:**
+- Press any button to turn screen back on
+- Activity timer resets
+- First button press is consumed (prevents accidental photo)
+
+**Configuration:**
+- Set `SCREENSAVER_TIMEOUT = "0"` to disable
+- Adjust timeout: `SCREENSAVER_TIMEOUT = "300"` for 5 minutes
 
 ---
 
@@ -252,18 +333,28 @@ API_RETRY_DELAY = 2                # Seconds between retries
 
 ### Adding Custom Prompts
 
+CloudLens prompts follow a 5-component structure for educational consistency:
+
 1. **Define your prompt** in `settings.toml`:
 ```toml
-MYMODE_LABEL = "My Custom Mode"
-MYMODE_PROMPT = "Describe this image as if you were a detective investigating a crime scene."
+MYMODE_LABEL = "DETECTIVE"
+MYMODE_QUALITY = "3"
+MYMODE_PROMPT = "ROLE: You are a detective investigating a crime scene.\n\nATTITUDE: Your analysis is methodical, detail-oriented, and evidence-focused.\n\nTASK: Analyze this image as if it were a crime scene, identifying key details and evidence.\n\nCONSTRAINTS:\n- Focus on observable facts, not speculation\n- Note positions, conditions, and relationships of objects\n- Identify potential evidence or anomalies\n- Keep analysis structured and professional\n\nOUTPUT FORMAT:\nEVIDENCE: [list key observations]\nANOMALIES: [unusual elements]\nTHEORY: [logical interpretation]"
 ```
 
 2. **Add to prompt order**:
 ```toml
-PROMPT_ORDER = "DESCRIBE,MYMODE,HAIKU,..."
+PROMPT_ORDER = "DESCRIBE,MYMODE,ART_ANALYSIS,..."
 ```
 
 3. **Reset device** to load new prompt
+
+**Prompt Engineering Tips:**
+- **ROLE**: Establishes expertise and perspective
+- **ATTITUDE**: Sets tone (formal, playful, analytical)
+- **TASK**: Clear, specific instruction
+- **CONSTRAINTS**: Rules prevent off-topic responses
+- **OUTPUT FORMAT**: Structure makes parsing easier
 
 ### Custom Quality Modes
 
@@ -302,6 +393,12 @@ Then add "CUSTOM" to `QUALITY_MODE_ORDER` in code.py
 - Check for spaces or quotes in `settings.toml`
 - Ensure API key has available credits
 - Test key at console.anthropic.com
+
+**Stuck at "Sending to Claude"**
+- Press SELECT button to cancel API call
+- Increase `API_TIMEOUT` (default 120s)
+- Check internet connection speed
+- Verify Claude API status
 
 **Timeout Errors**
 - Increase `API_TIMEOUT` (default 120s)
@@ -346,6 +443,23 @@ Then add "CUSTOM" to `QUALITY_MODE_ORDER` in code.py
 - Ensure card not write-protected
 - Try slower write speed
 
+### Display Issues
+
+**Mode Indicator Not Showing**
+- Prompt mode should appear in lower-left corner
+- Check that `_botbar` is visible
+- Reset device if UI elements missing
+
+**Screensaver Won't Activate**
+- Check `SCREENSAVER_TIMEOUT` in settings.toml
+- Ensure value is greater than 0
+- Verify 120 seconds of complete inactivity
+
+**Screensaver Won't Wake**
+- Press OK button firmly
+- Try other buttons (shutter, select)
+- Check for hardware button issues
+
 ### System Issues
 
 **System Error / Crashes**
@@ -372,18 +486,20 @@ Then add "CUSTOM" to `QUALITY_MODE_ORDER` in code.py
 ### Architecture
 
 **Main Components:**
-- `Config` class - Centralized settings management
+- `Config` class - Centralized settings management with quality ratings
 - `Logger` class - Structured logging
-- `TextViewer` class - Scrollable response display
+- `TextViewer` class - Scrollable response display with BRIEF/VERBOSE toggle
 - Image utilities - Size checking, encoding, retrieval
 - Camera utilities - Brightness detection, auto-flash
 - Network utilities - WiFi connection, retry logic
-- Claude API client - Image encoding, API communication
+- Claude API client - Image encoding, API communication with cancellation
+- Loading screen - Clean boot animation
+- Screensaver - Power management
 
 ### Optimizations
 
 **Memory Management:**
-- 18 strategic `gc.collect()` calls
+- Strategic `gc.collect()` calls throughout code
 - Immediate `del` after large operations
 - Base64 encoding with chunked cleanup
 
@@ -391,25 +507,36 @@ Then add "CUSTOM" to `QUALITY_MODE_ORDER` in code.py
 - Fast image retrieval using mtime (not sorting)
 - Integer math for brightness calculation (30*R + 59*G + 11*B / 100)
 - 5-point brightness sampling (reduced from 9)
-- Immediate feedback ("SNAP!") before processing
+- Immediate feedback ("snap") before processing
+- Smart truncation caches both BRIEF and VERBOSE in memory
 
 **Reliability:**
 - Zero bare `except` blocks (100% specific exceptions)
 - File existence validation before operations
 - SD card health check on startup
 - Comprehensive error recovery
+- SELECT button cancellation during API calls
 
 ### File Structure
 
 Images saved as: `/sd/IMG_####.JPG` (sequential numbering)
-Responses saved as: `/sd/IMG_PROMPTLABEL_####.TXT`
+Responses saved as: `/sd/IMG_####_response.txt`
 
 Example:
 ```
 /sd/IMG_0001.JPG
-/sd/IMG_DESCRIBE_0001.TXT
+/sd/IMG_0001_response.txt
 /sd/IMG_0002.JPG
-/sd/IMG_HAIKU_0002.TXT
+/sd/IMG_0002_response.txt
+```
+
+**Response File Format:**
+```
+Prompt: DESCRIBE
+Image: /sd/IMG_0001.JPG
+----------------------------------------
+
+[Full response text here]
 ```
 
 ### API Communication
@@ -432,26 +559,43 @@ Example:
 **Response Parsing:**
 Extracts `result["content"][0]["text"]` with validation at each level.
 
+### Prompt Engineering Framework
+
+CloudLens uses a structured 5-component prompt design that teaches effective AI instruction:
+
+**Component Breakdown:**
+1. **ROLE**: Establishes AI expertise and perspective (e.g., "art educator", "botanist")
+2. **ATTITUDE**: Sets communication tone (e.g., "precise and pedagogical", "playfully confused")
+3. **TASK**: Clear, specific objective (e.g., "Analyze using 7 formal elements")
+4. **CONSTRAINTS**: Boundaries and rules (e.g., "2-3 sentences", "ignore image quality")
+5. **OUTPUT FORMAT**: Exact structure specification (e.g., "LINE: [observation]")
+
+**Educational Value:**
+- Students learn prompt engineering by studying working examples
+- Quality ratings (1-3) demonstrate complexity levels
+- Each prompt is a self-contained lesson in AI instruction
+- Modifications teach how prompt components affect responses
+
 ---
 
 ## Project Structure
 
 ```
 cloudlens/
-├── code.py              # Main application (1,200 lines)
+├── code.py              # Main application (~1,600 lines)
 ├── settings.toml        # Complete configuration (all prompts & settings)
 ├── README.md            # This documentation
 └── LICENSE              # MIT License with dual copyright
 ```
 
 **Code Organization:**
-- Lines 1-193: Configuration and logging
-- Lines 194-289: Image and camera utilities
-- Lines 290-323: Network utilities
-- Lines 324-523: Claude API client
-- Lines 524-698: Text viewer UI
-- Lines 699-871: Display utilities
-- Lines 872-1200: Main application loop
+- Lines 1-210: Configuration, logging, and utilities
+- Lines 211-463: Image and camera utilities
+- Lines 464-576: Claude API client with cancellation
+- Lines 577-930: Text viewer UI with BRIEF/VERBOSE toggle
+- Lines 931-1055: Display utilities and loading screen
+- Lines 1056-1134: Boot screen and screensaver functions
+- Lines 1135-1650: Main application loop
 
 ---
 
@@ -459,26 +603,33 @@ cloudlens/
 
 ### Original Work
 **"OpenAI Image Descriptors with Memento"**
-Author: Liz Clark
-Copyright: (c) 2024 Liz Clark for Adafruit Industries
-Source: https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all
-License: MIT
+- Author: Liz Clark
+- Copyright: (c) 2024 Liz Clark for Adafruit Industries
+- Source: https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all
+- License: MIT
 
 ### Derivative Work
 **CloudLens**
-Author: William Chesher
-Copyright: (c) 2025 William Chesher
-License: MIT
+- Author: William Chesher
+- Copyright: (c) 2025 William Chesher
+- License: MIT
 
 **Major Modifications:**
 - Claude Vision API integration (replacing OpenAI)
-- 12 specialized prompt modes with dynamic loading
+- 12 specialized prompt modes with educational framework
+- BRIEF/VERBOSE toggle system with smart truncation
+- Prompt engineering framework (ROLE, ATTITUDE, TASK, CONSTRAINTS, OUTPUT FORMAT)
+- Quality rating system (1-3 stars) for prompts
 - 4-tier quality mode system with size management
+- Response archiving to SD card (.txt files)
 - Browse mode for saved image re-analysis
+- Screensaver mode with 120-second timeout
+- Clean boot screen with loading animation
+- SELECT button API cancellation
 - Production-grade optimizations (memory, performance, reliability)
 - Bulletproof error handling with specific exceptions
 - Complete configuration externalization
-- Professional UI with branding
+- Professional UI with dual quality indicators
 - Comprehensive documentation
 
 ---
@@ -496,14 +647,21 @@ This project is a derivative work based on Adafruit's "OpenAI Image Descriptors 
 
 ## Version
 
-**CloudLens 1.0 Production** - CircuitPython 10.x
+**CloudLens 1.0.0** - CircuitPython 10.x Production Release
 
-**Release Notes:**
+**Release Highlights:**
+- BRIEF/VERBOSE toggle system for smart response display
+- Educational prompt engineering framework (5 components)
+- Quality rating system (1-3 stars) for prompt complexity
+- Response archiving to SD card (.txt files)
+- Screensaver mode (120-second timeout)
+- Clean boot screen with loading animation
+- SELECT button API cancellation support
 - Production-ready stability
 - Zero bare exception blocks
 - Strategic memory optimization
 - Comprehensive error handling
-- Professional UI with branding
+- Professional UI with dual quality indicators
 - Full documentation
 
 **Requirements:**
@@ -511,3 +669,10 @@ This project is a derivative work based on Adafruit's "OpenAI Image Descriptors 
 - Anthropic API key with available credits
 - 2.4GHz WiFi network
 - FAT32 SD card
+
+**Educational Use:**
+CloudLens is designed as a teaching tool for prompt engineering and AI literacy. Each prompt demonstrates professional AI instruction design using the 5-component framework. Students can study, modify, and experiment with prompts to learn effective AI communication.
+
+---
+
+**Built with ❤️ for AI education and creative exploration**
