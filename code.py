@@ -1069,11 +1069,9 @@ def show_loading_screen(pycam, message="Loading", max_dots=5):
         while len(pycam.splash) > 0:
             pycam.splash.pop()
 
-        # Hide built-in status bars
+        # Hide topbar but leave botbar alone (we'll add content to it later)
         if hasattr(pycam, '_topbar'):
             pycam._topbar.hidden = True
-        if hasattr(pycam, '_botbar'):
-            pycam._botbar.hidden = True
 
         # Add CloudLens branding (top-left, same as viewfinder)
         branding = label.Label(
@@ -1126,9 +1124,7 @@ def show_loading_screen(pycam, message="Loading", max_dots=5):
         while len(pycam.splash) > 0:
             pycam.splash.pop()
 
-        # Restore botbar visibility
-        if hasattr(pycam, '_botbar'):
-            pycam._botbar.hidden = False
+        # Note: We don't touch _botbar here - content will be added later
 
     except Exception as e:
         logger.error("Loading screen error: {}", e)
@@ -1274,23 +1270,32 @@ def main():
         scale=2
     )
 
-    # Explicitly start preview mode to ensure display groups are active
+    # Start live preview mode first
     try:
         pycam.live_preview_mode()
         logger.info("Preview mode started")
     except (RuntimeError, AttributeError) as e:
         logger.warn("Could not start preview mode: {}", e)
 
+    # Add UI elements to display groups
+    logger.info("Adding rect and prompt_txt to _botbar")
     pycam._botbar.append(rect)
     pycam._botbar.append(prompt_txt)
     pycam._botbar.hidden = False  # Ensure bottom bar is visible
+
+    logger.info("Adding quality indicators and branding to splash")
     pycam.splash.append(quality_txt)
     pycam.splash.append(prompt_quality_txt)
     pycam.splash.append(branding_txt)
+
+    logger.info("Refreshing display")
     pycam.display.refresh()
 
-    logger.info("UI elements added - prompt mode: {}, stars: {}",
-                prompt_labels[prompt_index], quality_to_stars(prompt_qualities[prompt_index]))
+    logger.info("UI setup complete - mode: {}, stars: {}, _botbar.hidden: {}, _botbar length: {}",
+                prompt_labels[prompt_index],
+                quality_to_stars(prompt_qualities[prompt_index]),
+                pycam._botbar.hidden,
+                len(pycam._botbar))
 
     # Application state
     system_ready = False
