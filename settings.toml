@@ -91,6 +91,14 @@ TEXT_Y_POSITION = "20"
 MSG_DURATION = "0.5"
 
 # ============================================
+# RESPONSE DISPLAY CONFIGURATION
+# ============================================
+
+DEFAULT_VERBOSITY = "BRIEF"   # Default view when opening text (BRIEF or VERBOSE)
+SAVE_FULL_RESPONSES = "true"  # Save complete responses to SD card as .txt files
+BRIEF_MODE_LIMIT = "200"      # Character limit for BRIEF mode truncation
+
+# ============================================
 # PROMPT CONFIGURATION
 # ============================================
 
