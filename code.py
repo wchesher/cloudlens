@@ -1394,6 +1394,9 @@ def main():
                     mode_info = Config.get_quality_mode_info(current_mode)
                     logger.info("Capturing with {} mode (resolution {})", current_mode, mode_info["resolution"])
 
+                    # IMMEDIATE feedback BEFORE capture - instant response to button press
+                    pycam.display_message("snap", color=0x00FF00)
+
                     flash_enabled = False
                     if Config.AUTO_FLASH_ENABLED:
                         is_dark = check_brightness(pycam)
@@ -1405,10 +1408,7 @@ def main():
                             time.sleep(0.1)
 
                     pycam.capture_jpeg()
-
-                    # IMMEDIATE feedback that photo was taken
-                    pycam.display_message("snap", color=0x00FF00)
-                    time.sleep(0.3)  # Brief confirmation
+                    time.sleep(0.3)  # Brief confirmation after capture
 
                     if flash_enabled:
                         pycam.led_level = 0
