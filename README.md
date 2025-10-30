@@ -10,7 +10,7 @@
 
 **For experienced users:**
 
-1. Flash CircuitPython 10.x to PyCamera S3
+1. Flash CircuitPython 10.x to Adafruit Memento Camera Board
 2. Install libraries: `adafruit_pycamera`, `adafruit_requests`, `adafruit_display_text`, `jpegio`
 3. Copy `code.py` and `settings.toml` to CIRCUITPY drive
 4. Edit `settings.toml`: Add WiFi credentials and Anthropic API key (`sk-ant-...`)
@@ -68,25 +68,38 @@
 
 ## Hardware Requirements
 
-### Required
-- **Microcontroller**: Adafruit PyCamera S3 (ESP32-S3 based)
-- **Camera Module**: OV5640 or compatible (built-in on PyCamera)
-- **Display**: 240×240 pixel TFT (built-in on PyCamera)
+### Primary Hardware
+**Adafruit Memento Camera Board** - ESP32-S3 based AI camera platform
+- **Product**: [Adafruit Memento Camera](https://www.adafruit.com/product/5420)
+- **Guide**: [Adafruit Memento Learning Guide](https://learn.adafruit.com/adafruit-memento-camera-board?view=all)
+- **CircuitPython**: [Memento CircuitPython Page](https://circuitpython.org/board/adafruit_esp32s3_camera/)
+
+### Required Components
+- **Microcontroller**: Adafruit Memento Camera Board (ESP32-S3 based)
+- **Camera Module**: OV5640 5-megapixel camera (built-in)
+- **Display**: 240×240 pixel round TFT (built-in)
 - **SD Card**: Any size, FAT32 formatted
 - **WiFi**: 2.4GHz network access
-- **Power**: USB-C or battery (500mA recommended)
+- **Power**: USB-C or LiPo battery (500mA recommended)
 
-### Recommended
-- **SD Card**: Class 10 or better for faster writes
+### Recommended Accessories
+- **Enclosure**: [Memento Enclosure with LED Ring Flash](https://www.adafruit.com/product/5843)
+- **SD Card**: Class 10, 16-32GB recommended for faster writes
 - **WiFi**: Strong signal for reliable API calls
 - **Anthropic API**: Active API key with credits
+- **Battery**: 3.7V LiPo for portable operation
+
+### Compatible Hardware
+This code also works with:
+- Adafruit PyCamera S3 (uses same `adafruit_pycamera` library)
+- Any ESP32-S3 board with OV5640 camera using the PyCamera library
 
 ---
 
 ## Installation
 
 ### 1. Flash CircuitPython 10.x
-Download and install CircuitPython 10.x for PyCamera S3 from [circuitpython.org](https://circuitpython.org/board/adafruit_pycamera_s3/)
+Download and install CircuitPython 10.x for Adafruit Memento from the [Memento CircuitPython page](https://circuitpython.org/board/adafruit_esp32s3_camera/)
 
 ### 2. Install Libraries
 Copy these libraries from the CircuitPython bundle to `CIRCUITPY/lib/`:
@@ -109,7 +122,7 @@ ANTHROPIC_API_KEY = "sk-ant-your-api-key-here"
 ```
 
 ### 5. Insert SD Card
-Format SD card as FAT32, insert into PyCamera S3
+Format SD card as FAT32, insert into Memento Camera Board
 
 ### 6. Reset Device
 Press reset button or reconnect USB. Look for "CloudLens" on display.
