@@ -984,8 +984,8 @@ def main():
         text="CloudLens",
         color=0x00FF00,
         x=5,
-        y=8,
-        scale=1
+        y=18,
+        scale=2
     )
 
     pycam._botbar.append(rect)
