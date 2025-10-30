@@ -1263,29 +1263,17 @@ def main():
         scale=2
     )
 
-    # Start live preview mode FIRST (it clears splash!)
+    # Start live preview mode (this starts continuous capture)
     try:
         pycam.live_preview_mode()
-        logger.info("Preview mode started")
+        logger.info("Preview mode started - UI will be added after first blit")
     except (RuntimeError, AttributeError) as e:
         logger.warn("Could not start preview mode: {}", e)
-
-    # NOW add all UI elements AFTER live preview (so they overlay on camera)
-    logger.info("Adding UI elements to splash AFTER live preview")
-    pycam.splash.append(branding_txt)       # Upper-left
-    pycam.splash.append(quality_txt)        # Upper-right
-    pycam.splash.append(prompt_txt)         # Lower-left
-    pycam.splash.append(prompt_quality_txt) # Lower-right
-    pycam.display.refresh()
-
-    logger.info("UI setup complete - mode: {}, stars: {}, splash elements: {}",
-                prompt_labels[prompt_index],
-                quality_to_stars(prompt_qualities[prompt_index]),
-                len(pycam.splash))
 
     # Application state
     system_ready = False
     ready_message_cleared = False  # Track when READY message is fully cleared
+    ui_elements_added = False  # Track if UI has been added after first blit
     showing_captured_image = False
     view_mode = False
     browse_mode = False
@@ -1320,6 +1308,18 @@ def main():
                     frame = pycam.continuous_capture()
                     if frame and hasattr(frame, 'width') and hasattr(frame, 'height'):
                         pycam.blit(frame)
+
+                        # Add UI elements AFTER first blit (blit clears splash)
+                        if not ui_elements_added:
+                            logger.info("First blit complete, adding UI elements now")
+                            pycam.splash.append(branding_txt)
+                            pycam.splash.append(quality_txt)
+                            pycam.splash.append(prompt_txt)
+                            pycam.splash.append(prompt_quality_txt)
+                            pycam.display.refresh()
+                            ui_elements_added = True
+                            logger.info("UI elements added after blit, should persist now")
+
                         # Mark READY message as cleared after first frame
                         if not ready_message_cleared:
                             ready_message_cleared = True
