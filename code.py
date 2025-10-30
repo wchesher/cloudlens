@@ -384,14 +384,19 @@ def encode_image(image_path):
         logger.error("Encode failed: {}", e)
         return None
 
-def send_to_claude(requests_session, image_path, prompt, prompt_label):
-    """Send image to Claude API"""
+def send_to_claude(requests_session, image_path, prompt, prompt_label, pycam=None):
+    """Send image to Claude API with cancellation support
+
+    Args:
+        pycam: PyCamera object for cancel button monitoring (optional)
+    """
     if not requests_session:
         return False, "Error: No network"
 
     if not Config.ANTHROPIC_API_KEY:
         return False, "Error: No API key"
 
+    logger.info("Encoding image for Claude API...")
     base64_image = encode_image(image_path)
     if not base64_image:
         return False, "Error: Image too large or encoding failed"
@@ -426,7 +431,22 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label):
 
     for attempt in range(1, Config.API_RETRY_ATTEMPTS + 1):
         response = None
+
+        # Check for cancel button before attempting
+        if pycam:
+            try:
+                pycam.keys_debounce()
+                if pycam.select.fell:
+                    logger.info("API call cancelled by user")
+                    del base64_image
+                    gc.collect()
+                    return False, "Cancelled by user"
+            except (AttributeError, RuntimeError):
+                pass
+
         try:
+            logger.info("Sending to Claude API (attempt {}/{})...", attempt, Config.API_RETRY_ATTEMPTS)
+
             response = requests_session.post(
                 Config.CLAUDE_ENDPOINT,
                 headers=headers,
@@ -509,30 +529,63 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label):
             error_str = str(e)
             if "timed out" in error_str.lower() or "timeout" in error_str.lower():
                 logger.error("API timeout on attempt {}/{}", attempt, Config.API_RETRY_ATTEMPTS)
+
+                # Check for cancel during retry wait
                 if attempt < Config.API_RETRY_ATTEMPTS:
-                    logger.info("Retrying... (attempt {} of {})", attempt + 1, Config.API_RETRY_ATTEMPTS)
-                    time.sleep(Config.API_RETRY_DELAY)
+                    logger.info("Will retry in {} seconds (press SELECT to cancel)...", Config.API_RETRY_DELAY)
+
+                    # Wait with cancel check
+                    for _ in range(Config.API_RETRY_DELAY * 2):  # Check every 0.5s
+                        time.sleep(0.5)
+                        if pycam:
+                            try:
+                                pycam.keys_debounce()
+                                if pycam.select.fell:
+                                    logger.info("Retry cancelled by user")
+                                    del base64_image
+                                    gc.collect()
+                                    return False, "Cancelled by user"
+                            except (AttributeError, RuntimeError):
+                                pass
+
                     continue
-                return False, "Error: API timeout"
+                else:
+                    del base64_image
+                    gc.collect()
+                    return False, "Error: API timeout after retries"
             else:
                 logger.error("Network error: {}", error_str[:50])
                 if attempt < Config.API_RETRY_ATTEMPTS:
+                    logger.info("Retrying network request...")
                     time.sleep(Config.API_RETRY_DELAY)
                     continue
-                return False, f"Error: Network {error_str[:20]}"
+                else:
+                    del base64_image
+                    gc.collect()
+                    return False, f"Error: Network failure"
 
         except Exception as e:
             logger.error("Request failed: {}", str(e)[:50])
             if attempt < Config.API_RETRY_ATTEMPTS:
+                logger.info("Retrying after error...")
                 time.sleep(Config.API_RETRY_DELAY)
                 continue
-            return False, f"Error: {str(e)[:30]}"
+            else:
+                del base64_image
+                gc.collect()
+                return False, f"Error: Request failed"
 
         finally:
             if response:
-                response.close()
+                try:
+                    response.close()
+                except (AttributeError, RuntimeError):
+                    pass
             gc.collect()
 
+    # All retries exhausted
+    del base64_image
+    gc.collect()
     return False, "Error: All retries failed"
 
 def save_response(image_path, response_text, prompt_label):
@@ -1100,13 +1153,14 @@ def main():
                     showing_captured_image = True
 
                     # Immediate send - no delay
-                    show_status_overlay(pycam, "Sending to Claude...", 0x00DDDD)
+                    show_status_overlay(pycam, "Sending to Claude... (SELECT to cancel)", 0x00DDDD)
 
                     success, response = send_to_claude(
                         requests,
                         the_image,
                         prompts[prompt_index],
-                        prompt_labels[prompt_index]
+                        prompt_labels[prompt_index],
+                        pycam
                     )
 
                     showing_captured_image = False
@@ -1119,7 +1173,9 @@ def main():
                         gc.collect()
                     else:
                         clear_status_overlay(pycam)
-                        pycam.display_message(response, color=0xFF0000)
+                        # Show cancelled in yellow, errors in red
+                        error_color = 0xFFFF00 if "Cancelled" in response else 0xFF0000
+                        pycam.display_message(response, color=error_color)
                         time.sleep(2)
                         gc.collect()
 
@@ -1216,13 +1272,14 @@ def main():
                     filename_only = filename.split('/')[-1]
                     logger.info("Sending browsed image: {}", filename_only)
 
-                    show_status_overlay(pycam, "Sending to Claude...", 0x00DDDD)
+                    show_status_overlay(pycam, "Sending to Claude... (SELECT to cancel)", 0x00DDDD)
 
                     success, response = send_to_claude(
                         requests,
                         filename,
                         prompts[prompt_index],
-                        prompt_labels[prompt_index]
+                        prompt_labels[prompt_index],
+                        pycam
                     )
 
                     if success:
@@ -1234,7 +1291,9 @@ def main():
                         gc.collect()
                     else:
                         clear_status_overlay(pycam)
-                        pycam.display_message(response, color=0xFF0000)
+                        # Show cancelled in yellow, errors in red
+                        error_color = 0xFFFF00 if "Cancelled" in response else 0xFF0000
+                        pycam.display_message(response, color=error_color)
                         time.sleep(2)
                         pycam.display.refresh()
                         gc.collect()
