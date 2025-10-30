@@ -1550,6 +1550,7 @@ def main():
                     showing_captured_image = False
                     view_mode = False
                     browse_mode = False  # Ensure browse mode is off
+                    ui_elements_added = False  # Reset so UI elements get re-added after next blit
 
                     # Force viewfinder restart
                     try:
@@ -1560,7 +1561,7 @@ def main():
 
                     # Force display refresh
                     pycam.display.refresh()
-                    logger.info("Back to viewfinder mode - shutter enabled")
+                    logger.info("Back to viewfinder mode - shutter enabled, UI will be re-added")
 
                 elif browse_mode:
                     filename = all_images[file_index]
