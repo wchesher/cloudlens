@@ -7,7 +7,7 @@
 # Modified for Claude Vision API and extensive feature additions
 """
 CloudLens - AI Camera with Claude Vision API
-CircuitPython 10.x compatible - Version 1.0 Production
+Version 1.0.0 - CircuitPython 10.x compatible
 
 Derived from Adafruit's OpenAI Image Descriptors project by Liz Clark
 Modified to use Claude Vision API with extensive optimizations and features
