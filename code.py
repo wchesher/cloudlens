@@ -619,10 +619,26 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label, pycam=Non
 
         except OSError as e:
             error_str = str(e)
-            if "timed out" in error_str.lower() or "timeout" in error_str.lower():
-                logger.error("API timeout on attempt {}/{}", attempt, Config.API_RETRY_ATTEMPTS)
+            # Extract errno if available
+            errno = None
+            if hasattr(e, 'errno'):
+                errno = e.errno
 
-                # Check for cancel during retry wait
+            # Handle specific error codes
+            if errno == 113 or "ECONNABORTED" in error_str:
+                logger.error("Connection aborted (ECONNABORTED) - WiFi may have dropped")
+                logger.error("Attempt {}/{}", attempt, Config.API_RETRY_ATTEMPTS)
+            elif errno == -29312 or "-29312" in error_str:
+                logger.error("TLS/SSL error (-29312) - Possible WiFi interference or weak signal")
+                logger.error("Attempt {}/{}", attempt, Config.API_RETRY_ATTEMPTS)
+            elif "timed out" in error_str.lower() or "timeout" in error_str.lower():
+                logger.error("API timeout on attempt {}/{}", attempt, Config.API_RETRY_ATTEMPTS)
+            else:
+                logger.error("Network error: {}", error_str[:50])
+                logger.error("Attempt {}/{}", attempt, Config.API_RETRY_ATTEMPTS)
+
+            # For timeout errors, use special cancel-aware retry logic
+            if "timed out" in error_str.lower() or "timeout" in error_str.lower():
                 if attempt < Config.API_RETRY_ATTEMPTS:
                     logger.info("Will retry in {} seconds (press SELECT to cancel)...", Config.API_RETRY_DELAY)
 
@@ -645,16 +661,22 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label, pycam=Non
                     del base64_image
                     gc.collect()
                     return False, "Error: API timeout after retries"
+
+            # For other network errors, retry with standard delay
+            if attempt < Config.API_RETRY_ATTEMPTS:
+                logger.info("Retrying network request...")
+                time.sleep(Config.API_RETRY_DELAY)
+                continue
             else:
-                logger.error("Network error: {}", error_str[:50])
-                if attempt < Config.API_RETRY_ATTEMPTS:
-                    logger.info("Retrying network request...")
-                    time.sleep(Config.API_RETRY_DELAY)
-                    continue
+                del base64_image
+                gc.collect()
+                # Return specific error message based on error type
+                if errno == 113 or "ECONNABORTED" in error_str:
+                    return False, "Error: WiFi connection lost"
+                elif errno == -29312 or "-29312" in error_str:
+                    return False, "Error: TLS/SSL failure"
                 else:
-                    del base64_image
-                    gc.collect()
-                    return False, f"Error: Network failure"
+                    return False, "Error: Network failure"
 
         except Exception as e:
             logger.error("Request failed: {}", str(e)[:50])
@@ -1049,6 +1071,74 @@ def check_sd_card():
     except (OSError, RuntimeError):
         return False
 
+def check_sd_card_space():
+    """Check SD card free space and warn if low
+
+    Returns:
+        tuple: (is_ok, free_kb, total_kb, percent_free)
+    """
+    try:
+        stat = os.statvfs("/sd")
+        # f_frsize = fragment size, f_bavail = available blocks
+        free_blocks = stat[4]  # f_bavail
+        block_size = stat[0]   # f_frsize
+        total_blocks = stat[2] # f_blocks
+
+        free_kb = (free_blocks * block_size) // 1024
+        total_kb = (total_blocks * block_size) // 1024
+
+        if total_kb > 0:
+            percent_free = (free_blocks * 100) // total_blocks
+        else:
+            percent_free = 0
+
+        # Warn if less than 1MB free
+        is_ok = free_kb > 1024
+
+        return is_ok, free_kb, total_kb, percent_free
+
+    except (OSError, AttributeError, IndexError):
+        # If we can't check, assume it's okay (avoid false alarms)
+        return True, -1, -1, -1
+
+def test_sd_card_write():
+    """Test if SD card is writable and not corrupted
+
+    Returns:
+        tuple: (is_ok, error_message)
+    """
+    test_file = "/sd/.cloudlens_test"
+    try:
+        # Try to write a small test file
+        with open(test_file, 'w') as f:
+            f.write("test")
+            f.flush()
+
+        # Try to read it back
+        with open(test_file, 'r') as f:
+            content = f.read()
+            if content != "test":
+                return False, "SD card read/write mismatch"
+
+        # Clean up
+        try:
+            os.remove(test_file)
+        except OSError:
+            pass
+
+        return True, "OK"
+
+    except OSError as e:
+        error_str = str(e)
+        if "EROFS" in error_str or "Read-only" in error_str:
+            return False, "SD card is read-only"
+        elif "ENOSPC" in error_str or "No space" in error_str:
+            return False, "SD card is full"
+        else:
+            return False, f"SD card write error: {error_str[:30]}"
+    except Exception as e:
+        return False, f"SD card test failed: {str(e)[:30]}"
+
 def change_quality_mode(pycam, quality_mode_index, quality_txt):
     """Change quality mode and update display - consolidated function"""
     current_mode = Config.QUALITY_MODE_ORDER[quality_mode_index]
@@ -1110,29 +1200,9 @@ def show_loading_screen(pycam, message="Loading", max_dots=5):
             pycam.display.refresh()
             time.sleep(0.3)
 
-        # Clear for "ready" message
+        # Clear everything - ready message will be shown AFTER viewfinder is up
         while len(pycam.splash) > 0:
             pycam.splash.pop()
-
-        # Show READY with branding
-        pycam.splash.append(branding)
-        ready_label = label.Label(
-            terminalio.FONT,
-            text="ready",
-            color=0x00FF00,
-            x=5,
-            y=220,
-            scale=2
-        )
-        pycam.splash.append(ready_label)
-        pycam.display.refresh()
-        time.sleep(1.0)
-
-        # Clear everything for normal operation
-        while len(pycam.splash) > 0:
-            pycam.splash.pop()
-
-        # Note: We don't touch _botbar here - content will be added later
 
     except Exception as e:
         logger.error("Loading screen error: {}", e)
@@ -1168,6 +1238,25 @@ def main():
         return
 
     logger.info("SD card detected")
+
+    # Test SD card write capability
+    write_ok, write_msg = test_sd_card_write()
+    if not write_ok:
+        logger.error("SD card write test failed: {}", write_msg)
+        logger.error("Please check SD card and restart")
+        return
+    logger.info("SD card write test: OK")
+
+    # Check SD card space
+    space_ok, free_kb, total_kb, percent_free = check_sd_card_space()
+    if free_kb >= 0:  # Valid measurement
+        logger.info("SD card space: {} KB free / {} KB total ({}% free)",
+                   free_kb, total_kb, percent_free)
+        if not space_ok:
+            logger.warn("SD card space LOW! Less than 1MB remaining")
+            logger.warn("Please backup and clear space soon")
+    else:
+        logger.info("SD card space check not available")
 
     # Connect to WiFi
     requests = connect_wifi()
@@ -1280,6 +1369,7 @@ def main():
 
     # Application state
     system_ready = False
+    ready_message_shown = False  # Track if we've shown ready after viewfinder starts
     ready_message_cleared = False  # Track when READY message is fully cleared
     ui_elements_added = False  # Track if UI has been added after first blit
     showing_captured_image = False
@@ -1329,9 +1419,35 @@ def main():
                             ui_elements_added = True
                             logger.info("UI elements added after blit, should persist now")
 
-                        # Mark READY message as cleared after first frame
-                        if not ready_message_cleared:
+                        # Show READY message after UI is up (viewfinder is running)
+                        if ui_elements_added and not ready_message_shown:
+                            logger.info("Viewfinder running, showing ready message")
+                            # Show "ready" as overlay (where snap appears)
+                            ready_label = label.Label(
+                                terminalio.FONT,
+                                text="ready",
+                                color=0x00FF00,
+                                background_color=0x000000,
+                                x=5,
+                                y=225,
+                                scale=2
+                            )
+                            pycam.splash.append(ready_label)
+                            pycam.display.refresh()
+                            time.sleep(2.0)  # Show for 2 seconds
+
+                            # Clear ready message
+                            try:
+                                pycam.splash.remove(ready_label)
+                            except (ValueError, AttributeError):
+                                pass
+
+                            # Refresh to clear any artifacts
+                            pycam.display.refresh()
+
+                            ready_message_shown = True
                             ready_message_cleared = True
+                            logger.info("Ready message cleared, system fully ready")
                 except (RuntimeError, AttributeError, OSError):
                     pass
 
