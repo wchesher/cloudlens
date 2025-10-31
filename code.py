@@ -920,6 +920,14 @@ class TextViewer:
             except (ValueError, AttributeError):
                 pass
 
+        # Reset all cached data to prevent showing old responses
+        self.response_brief = ""
+        self.response_verbose = ""
+        self.full_text = ""
+        self.lines = []
+        self.current_prompt_label = ""
+        self.scroll_pos = 0
+
         self.rectangle = None
         self.text_area = None
         self.page_indicator = None
