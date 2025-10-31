@@ -1200,29 +1200,9 @@ def show_loading_screen(pycam, message="Loading", max_dots=5):
             pycam.display.refresh()
             time.sleep(0.3)
 
-        # Clear for "ready" message
+        # Clear everything - ready message will be shown AFTER viewfinder is up
         while len(pycam.splash) > 0:
             pycam.splash.pop()
-
-        # Show READY with branding
-        pycam.splash.append(branding)
-        ready_label = label.Label(
-            terminalio.FONT,
-            text="ready",
-            color=0x00FF00,
-            x=5,
-            y=220,
-            scale=2
-        )
-        pycam.splash.append(ready_label)
-        pycam.display.refresh()
-        time.sleep(1.0)
-
-        # Clear everything for normal operation
-        while len(pycam.splash) > 0:
-            pycam.splash.pop()
-
-        # Note: We don't touch _botbar here - content will be added later
 
     except Exception as e:
         logger.error("Loading screen error: {}", e)
@@ -1389,6 +1369,7 @@ def main():
 
     # Application state
     system_ready = False
+    ready_message_shown = False  # Track if we've shown ready after viewfinder starts
     ready_message_cleared = False  # Track when READY message is fully cleared
     ui_elements_added = False  # Track if UI has been added after first blit
     showing_captured_image = False
@@ -1438,9 +1419,35 @@ def main():
                             ui_elements_added = True
                             logger.info("UI elements added after blit, should persist now")
 
-                        # Mark READY message as cleared after first frame
-                        if not ready_message_cleared:
+                        # Show READY message after UI is up (viewfinder is running)
+                        if ui_elements_added and not ready_message_shown:
+                            logger.info("Viewfinder running, showing ready message")
+                            # Show "ready" as overlay (where snap appears)
+                            ready_label = label.Label(
+                                terminalio.FONT,
+                                text="ready",
+                                color=0x00FF00,
+                                background_color=0x000000,
+                                x=5,
+                                y=225,
+                                scale=2
+                            )
+                            pycam.splash.append(ready_label)
+                            pycam.display.refresh()
+                            time.sleep(2.0)  # Show for 2 seconds
+
+                            # Clear ready message
+                            try:
+                                pycam.splash.remove(ready_label)
+                            except (ValueError, AttributeError):
+                                pass
+
+                            # Refresh to clear any artifacts
+                            pycam.display.refresh()
+
+                            ready_message_shown = True
                             ready_message_cleared = True
+                            logger.info("Ready message cleared, system fully ready")
                 except (RuntimeError, AttributeError, OSError):
                     pass
 
