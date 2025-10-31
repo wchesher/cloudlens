@@ -480,6 +480,10 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label, pycam=Non
     if not Config.ANTHROPIC_API_KEY:
         return False, "Error: No API key"
 
+    # Log which image is being sent
+    image_filename = image_path.split('/')[-1] if image_path else "unknown"
+    logger.info("=== SENDING TO CLAUDE: {} with prompt '{}' ===", image_filename, prompt_label)
+
     logger.info("Encoding image for Claude API...")
     base64_image = encode_image(image_path)
     if not base64_image:
@@ -559,6 +563,10 @@ def send_to_claude(requests_session, image_path, prompt, prompt_label, pycam=Non
                     if not response_text:
                         logger.error("API returned empty text")
                         return False, "Error: Empty response from Claude"
+
+                    # Log response preview for debugging
+                    response_preview = response_text[:50].replace('\n', ' ') if len(response_text) > 50 else response_text.replace('\n', ' ')
+                    logger.info("=== RECEIVED RESPONSE: '{}...' (len={}) ===", response_preview, len(response_text))
 
                     print("="*60)
                     print(f"PROMPT: {prompt_label}")
@@ -920,14 +928,6 @@ class TextViewer:
             except (ValueError, AttributeError):
                 pass
 
-        # Reset all cached data to prevent showing old responses
-        self.response_brief = ""
-        self.response_verbose = ""
-        self.full_text = ""
-        self.lines = []
-        self.current_prompt_label = ""
-        self.scroll_pos = 0
-
         self.rectangle = None
         self.text_area = None
         self.page_indicator = None
@@ -1287,6 +1287,7 @@ def main():
     browse_mode = False
     file_index = -1
     all_images = get_sorted_images()
+    last_sent_image = None  # Track last image sent to prevent sending duplicates
 
     # Screensaver state
     screensaver_active = False
@@ -1402,7 +1403,7 @@ def main():
                             time.sleep(0.1)
 
                     pycam.capture_jpeg()
-                    time.sleep(0.3)  # Brief confirmation after capture
+                    time.sleep(0.5)  # Wait for file system to update
 
                     if flash_enabled:
                         pycam.led_level = 0
@@ -1416,8 +1417,23 @@ def main():
                         gc.collect()
                         continue
 
+                    # Check if this is the same image we just sent (duplicate detection)
+                    if the_image == last_sent_image:
+                        logger.error("DUPLICATE IMAGE DETECTED: {} - capture may have failed!", the_image.split('/')[-1])
+                        pycam.display_message("Duplicate image!\nRetry capture", color=0xFF0000)
+                        time.sleep(2)
+                        gc.collect()
+                        continue
+
                     filename_only = the_image.split('/')[-1]
-                    logger.info("Captured: {}", filename_only)
+                    # Get file details for debugging
+                    try:
+                        stat = os.stat(the_image)
+                        file_mtime = stat[8]
+                        file_size = stat[6]
+                        logger.info("Captured: {} (mtime={}, size={})", filename_only, file_mtime, file_size)
+                    except (OSError, IndexError):
+                        logger.info("Captured: {}", filename_only)
 
                     is_ok, size_kb, size_msg = check_image_size(the_image, mode_info)
                     logger.info("Image size: {}", size_msg)
@@ -1445,6 +1461,9 @@ def main():
 
                     if success:
                         clear_status_overlay(pycam)
+
+                        # Track that we successfully sent this image
+                        last_sent_image = the_image
 
                         # Create both brief and verbose versions
                         response_brief = create_brief_response(response, prompt_labels[prompt_index])
@@ -1589,6 +1608,9 @@ def main():
                     if success:
                         browse_mode = False
                         clear_status_overlay(pycam)
+
+                        # Track that we successfully sent this image
+                        last_sent_image = filename
 
                         # Create both brief and verbose versions
                         response_brief = create_brief_response(response, prompt_labels[prompt_index])
