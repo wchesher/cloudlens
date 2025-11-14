@@ -1,6 +1,6 @@
 # CloudLens: AI Vision Camera for CircuitPython
 
-**Professional AI-powered camera system for microcontrollers.** CloudLens integrates hardware cameras with Anthropic's Claude Vision API for real-time image analysis. Capture photos and receive instant AI-powered insights through 12 specialized prompt modes with educational prompt engineering framework.
+**AI-powered camera system for Adafruit Memento.** CloudLens integrates hardware cameras with Anthropic's Claude Vision API for real-time image analysis. Capture photos and receive instant AI-powered insights through 12 specialized prompt modes with educational prompt engineering framework.
 
 **Based on** [OpenAI Image Descriptors with Memento](https://learn.adafruit.com/openai-image-descriptors-with-memento?view=all) by Liz Clark for Adafruit Industries. Extensively modified for Claude Vision API with production-grade optimizations and features.
 
